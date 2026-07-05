@@ -93,7 +93,9 @@ class Qwen3VLGeoWireForConditionalGeneration(nn.Module):
             concat = torch.cat(image_embeds, dim=0)
             if graph.num_nodes != concat.shape[0]:
                 raise ValueError(f"GeoWire graph has {graph.num_nodes} nodes but Qwen produced {concat.shape[0]} image tokens")
-            transported = self.geowire(concat, graph_to_device(graph, concat.device))
+            geowire_dtype = next(self.geowire.parameters()).dtype
+            transported = self.geowire(concat.to(dtype=geowire_dtype), graph_to_device(graph, concat.device))
+            transported = transported.to(dtype=concat.dtype)
             return tuple(torch.split(transported, split_sizes, dim=0)), deepstack_image_embeds
 
         self.base_model.model.get_image_features = MethodType(patched_get_image_features, self.base_model.model)
