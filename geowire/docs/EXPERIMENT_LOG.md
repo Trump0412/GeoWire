@@ -9,12 +9,14 @@ Status: software smoke passed locally on 2026-07-06.
 - TIP debug command: `python scripts/train_tip.py --output runs/tip_debug`
 - Full smoke command: `python scripts/smoke_all.py --output runs/smoke_local`
 
-Latest smoke:
+Latest local smoke:
 
 ```text
-24 passed, 1 skipped
+26 passed, 1 skipped
 toy cache generated
 toy graph normalized
+phase1 readiness passed on toy cache
+cached TIP checkpoint written
 coordinate roundtrip max error < 0.5 px
 ```
 

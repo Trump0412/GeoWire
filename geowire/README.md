@@ -40,7 +40,8 @@ python scripts/generate_toy_scene.py --output assets/toy_scene --manifest assets
 python scripts/verify_coordinate_contract.py --write runs/coordinate_contract.json
 python scripts/cache_vggt.py --manifest assets/toy_scene/manifest.jsonl --cache-root runs/toy_cache --backend toy
 python scripts/build_graphs.py --manifest assets/toy_scene/manifest.jsonl --cache-root runs/toy_cache --output runs/phase0_graph
-python scripts/train_tip.py --output runs/tip_debug
+python scripts/check_training_readiness.py --phase phase1 --manifest assets/toy_scene/manifest.jsonl --cache-root runs/toy_cache
+python scripts/train_tip.py --manifest assets/toy_scene/manifest.jsonl --cache-root runs/toy_cache --output runs/tip_debug --steps 2
 ```
 
 Or run the bundled smoke:
@@ -68,6 +69,8 @@ Implemented now:
 - sparse graph merge, top-k, normalization and NPZ IO;
 - sparse transport and GeoWire blocks;
 - TIP v0.2 debug losses and graph controls;
+- cached Phase 1 TIP training entrypoint;
+- Phase 1 readiness and tmux launch scripts;
 - leakage audit;
 - Qwen/VGGT inspection and resource download entrypoints.
 

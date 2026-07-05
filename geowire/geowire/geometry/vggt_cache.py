@@ -77,3 +77,22 @@ def load_token_layout(path: str | Path) -> TokenLayout:
         center_vggt_xy=data["center_vggt_xy"].float(),
         valid=data["valid"].bool(),
     )
+
+
+def save_semantic_tokens(path: str | Path, hidden: torch.Tensor) -> None:
+    """Save frozen semantic visual tokens for Phase 1 TIP training."""
+
+    if hidden.ndim != 2:
+        raise ValueError("hidden must be [N, D]")
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    save_file({"hidden": hidden.detach().cpu().float()}, str(path))
+
+
+def load_semantic_tokens(path: str | Path) -> torch.Tensor:
+    data = load_file(str(path))
+    if "hidden" not in data:
+        raise KeyError(f"{path} does not contain tensor 'hidden'")
+    hidden = data["hidden"].float()
+    if hidden.ndim != 2:
+        raise ValueError("cached hidden tensor must be [N, D]")
+    return hidden

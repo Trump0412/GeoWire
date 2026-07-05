@@ -30,14 +30,18 @@ with `/mnt/guojh/lq/new/conda/envs/geothinker/bin/python`.
 - Coordinate contract check.
 - Toy cache generation.
 - Cached-layout graph construction and NPZ IO.
+- Standard cached semantic-token file: `semantic_tokens.safetensors`.
 - Sparse transport and GeoWire blocks.
 - TIP v0.2 recovery/substitution/keep losses.
 - Non-edge isolation diagnostic kept out of training loss.
 - Self-loop/random/shuffled graph controls.
+- Cached Phase 1 training loop with checkpoint and metrics output.
+- Phase 1 readiness check and tmux launcher.
 
 ## Still Gated
 
 - Real VGGT cache generation.
+- Real Qwen visual-token caching into `semantic_tokens.safetensors`.
 - Manual visual graph audit on real clips.
 - Qwen3-VL bridge inspection. Current server `transformers==4.50.0` is too old
   for the Qwen3-VL inspection gate.

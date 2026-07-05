@@ -18,10 +18,14 @@ Last updated: 2026-07-06
 - Coordinate contract roundtrip check passes for 16:9, 9:16, 4:3 and tall inputs.
 - Toy cache generation writes metadata, frame transforms, qwen input metadata and token layout.
 - Graph construction writes normalized sparse COO graphs from cached token layouts.
+- Toy/real cache contract now includes `semantic_tokens.safetensors`; Phase 1 consumes this as frozen Qwen semantic-token cache.
 - Sparse transport and GeoWire blocks are implemented with alpha initialized to zero.
 - TIP v0.2 losses are implemented: recovery + substitution + optional keep.
 - Non-edge isolation is retained as a diagnostic, not a training loss.
 - Random/shuffled/self-loop graph diagnostics are available for Phase 1 debug.
+- Cached Phase 1 entrypoint can train GeoWire from `manifest + cache_root`, saving `geowire_adapter.pt`, `metrics.jsonl`, `metrics.json` and `trainer_state.json`.
+- `scripts/check_training_readiness.py` validates Phase 1 cache completeness.
+- `scripts/launch_phase1_tip_tmux.sh` starts Phase 1 in tmux after readiness checks.
 
 ## Latest Local Smoke
 
@@ -35,9 +39,10 @@ python scripts/smoke_all.py --output runs/smoke_local
 Result:
 
 ```text
-24 passed, 1 skipped
+26 passed, 1 skipped
 coordinate contract passed
 toy graph row sums min/max = 1.0 / 1.0
+cached TIP checkpoint written
 ```
 
 ## Latest Server Smoke
@@ -68,6 +73,20 @@ toy graph row sums min/max = 1.0 / 1.0
 - `Qwen3-VL-4B-Instruct`: present at `/mnt/guojh/lq/new/weights/base_models/Qwen3-VL-4B-Instruct` (`8.3G`).
 - `VGGT-1B`: present at `/mnt/guojh/lq/new/weights/base_models/VGGT-1B` (`9.4G`).
 - Current server `transformers==4.50.0`; Qwen3-VL bridge inspection is gated until a Qwen3-VL-compatible Transformers build is installed or vendored.
+
+## Phase 1 Launch Template
+
+After real cached clips have `token_layout.safetensors`, `semantic_tokens.safetensors`,
+`graph_coo.npz` and `metadata.json`, launch:
+
+```bash
+cd /mnt/guojh/lq/new/GeoWire/geowire
+MANIFEST=/path/to/train_manifest.jsonl \
+CACHE_ROOT=/mnt/guojh/lq/new/cache/geowire/phase1 \
+STEPS=30000 \
+SESSION=geowire_phase1_tip \
+./scripts/launch_phase1_tip_tmux.sh
+```
 
 ## Gated Before Real Training
 

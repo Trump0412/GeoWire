@@ -67,12 +67,39 @@ def main() -> None:
     run(
         [
             py,
+            "scripts/check_training_readiness.py",
+            "--phase",
+            "phase1",
+            "--manifest",
+            "assets/toy_scene/manifest.jsonl",
+            "--cache-root",
+            str(args.output / "toy_cache"),
+            "--write",
+            str(args.output / "phase1_readiness.json"),
+        ]
+    )
+    run(
+        [
+            py,
             "scripts/verify_graph.py",
             "--graph",
             str(args.output / "toy_cache" / "toy_scene_clip_000" / "graph_coo.npz"),
         ]
     )
-    run([py, "scripts/train_tip.py", "--output", str(args.output / "tip_debug")])
+    run(
+        [
+            py,
+            "scripts/train_tip.py",
+            "--manifest",
+            "assets/toy_scene/manifest.jsonl",
+            "--cache-root",
+            str(args.output / "toy_cache"),
+            "--output",
+            str(args.output / "tip_debug"),
+            "--steps",
+            "2",
+        ]
+    )
     if not args.skip_tests:
         run([py, "-m", "pytest", "-q"])
     print(args.output)
