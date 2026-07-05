@@ -18,4 +18,20 @@ toy graph normalized
 coordinate roundtrip max error < 0.5 px
 ```
 
+Server smoke:
+
+```text
+path: /mnt/guojh/lq/new/GeoWire/geowire
+python: /mnt/guojh/lq/new/conda/envs/geothinker/bin/python
+result: 24 passed, 1 skipped
+gpu: 8 x A100 80GB visible
+```
+
+Qwen3-VL inspection:
+
+```text
+server transformers: 4.50.0
+status: gated; install or vendor a Qwen3-VL-compatible Transformers build before bridge parity
+```
+
 No Phase 1 or Phase 2 result is claimed until VGGT cache, graph overlays and Qwen bridge parity pass.

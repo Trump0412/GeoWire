@@ -40,6 +40,35 @@ coordinate contract passed
 toy graph row sums min/max = 1.0 / 1.0
 ```
 
+## Latest Server Smoke
+
+Path:
+
+```text
+/mnt/guojh/lq/new/GeoWire
+```
+
+Command:
+
+```bash
+cd /mnt/guojh/lq/new/GeoWire/geowire
+/mnt/guojh/lq/new/conda/envs/geothinker/bin/python scripts/smoke_all.py --output runs/smoke_server
+```
+
+Result:
+
+```text
+24 passed, 1 skipped
+8 x A100 80GB visible
+toy graph row sums min/max = 1.0 / 1.0
+```
+
+## Server Resource Check
+
+- `Qwen3-VL-4B-Instruct`: present at `/mnt/guojh/lq/new/weights/base_models/Qwen3-VL-4B-Instruct` (`8.3G`).
+- `VGGT-1B`: present at `/mnt/guojh/lq/new/weights/base_models/VGGT-1B` (`9.4G`).
+- Current server `transformers==4.50.0`; Qwen3-VL bridge inspection is gated until a Qwen3-VL-compatible Transformers build is installed or vendored.
+
 ## Gated Before Real Training
 
 - Real VGGT cache generation requires pinned `third_party/vggt`, VGGT-1B weights and visual graph audit.
