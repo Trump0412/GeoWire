@@ -62,14 +62,25 @@ is still gated below.
 - Phase 1 readiness check and tmux launcher.
 - Prediction JSONL evaluator with benchmark config/normalizer recording.
 - Server cached Phase 1 toy training completed through step 50 on an idle A100.
+- Real Qwen3-VL semantic-token cache generation.
+- Real VGGT geometry/track cache generation from pinned `third_party/vggt`.
+- Real track/projective graph construction with configurable thresholds.
+- Qwen3-VL image-feature bridge with alpha-zero parity script.
+- Phase 2 SFT trainer with Qwen LoRA + GeoWire and `3 QA : 1 TIP` schedule.
+- Phase 2 tmux launcher with real cache and parity readiness gate.
 
-## Still Gated
+## Latest Real Server Gates
 
-- Real VGGT cache generation.
-- Real Qwen visual-token caching into `semantic_tokens.safetensors`.
-- Manual visual graph audit on real clips.
-- Qwen3-VL bridge inspection. Current server `transformers==4.50.0` is too old
-  for the Qwen3-VL inspection gate.
-- Qwen bridge alpha=0 parity.
-- Phase 1 real TIP training.
-- Phase 2 spatial SFT.
+```text
+real cache: runs/real_backend_smoke_cache
+real graph stats: track_edges=32, projective_edges=138, self_edges=160
+phase1 real smoke: runs/real_backend_phase1_tip_smoke, steps=2
+qwen parity: runs/qwen_bridge_parity/real_backend_smoke_report.json, max_abs_logit_diff=0.0
+phase2 real smoke: runs/phase2_sft_smoke_real_backend_4step, schedule reached TIP on step 4
+```
+
+## Still Gated Before Full Runs
+
+- Real training manifests and cache roots for SPAR/LLaVA-Hound/XVR are not yet selected in this repo.
+- Manual visual graph audit and threshold calibration are still required before launching large Phase 1.
+- Real benchmark generation is not yet run; only the prediction scorer is implemented.

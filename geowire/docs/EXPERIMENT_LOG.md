@@ -55,8 +55,48 @@ eval_shuffled_graph_gap: 0.2560940384864807
 Qwen3-VL inspection:
 
 ```text
-server transformers: 4.50.0
-status: gated; install or vendor a Qwen3-VL-compatible Transformers build before bridge parity
+shared env transformers: 4.50.0
+GeoWire overlay transformers: /mnt/guojh/lq/new/GeoWire/.deps/transformers_4_57_6
+overlay status: transformers 4.57.6 import ok
+VGGT source: /mnt/guojh/lq/new/GeoWire/third_party/vggt @ a288dd0
 ```
 
-No Phase 1 or Phase 2 result is claimed until VGGT cache, graph overlays and Qwen bridge parity pass.
+Real backend smoke:
+
+```text
+date: 2026-07-06
+manifest: assets/real_backend_smoke_scene/manifest.jsonl
+cache: runs/real_backend_smoke_cache
+graph: runs/real_backend_smoke_graph_loose
+graph stats: track_edges=32, projective_edges=138, self_edges=160
+readiness: phase1 --require-real-cache passed with min_cross_frame_coverage=0.01
+note: loose graph thresholds were used for engineering smoke; real training requires calibrated thresholds and visual audit
+```
+
+Real Phase 1 smoke:
+
+```text
+output: runs/real_backend_phase1_tip_smoke
+steps: 2
+checkpoint: runs/real_backend_phase1_tip_smoke/geowire_adapter.pt
+eval_random_graph_gap: 0.02674686908721924
+eval_shuffled_graph_gap: 0.04390311241149902
+```
+
+Qwen bridge parity:
+
+```text
+report: runs/qwen_bridge_parity/real_backend_smoke_report.json
+passed: true
+max_abs_logit_diff: 0.0
+```
+
+Real Phase 2 SFT smoke:
+
+```text
+output: runs/phase2_sft_smoke_real_backend_4step
+steps: 4
+schedule: QA, QA, QA, TIP
+final_loss: 0.5104734301567078
+adapter: runs/phase2_sft_smoke_real_backend_4step/phase2_adapters.pt
+```

@@ -26,6 +26,11 @@ Last updated: 2026-07-06
 - Cached Phase 1 entrypoint can train GeoWire from `manifest + cache_root`, saving `geowire_adapter.pt`, `metrics.jsonl`, `metrics.json` and `trainer_state.json`.
 - `scripts/check_training_readiness.py` validates Phase 1 cache completeness.
 - `scripts/launch_phase1_tip_tmux.sh` starts Phase 1 in tmux after readiness checks.
+- Real Phase 0 cache generation is implemented for Qwen3-VL semantic tokens plus VGGT geometry/tracks.
+- Real graph building can use track and projective VGGT candidates with configurable precision/coverage thresholds.
+- Qwen3-VL bridge is implemented as an image-feature-path wrapper and has a real alpha-zero parity script.
+- Phase 2 SFT entrypoint can train Qwen LoRA + GeoWire with a `3 QA : 1 TIP` schedule.
+- `scripts/launch_phase2_sft_tmux.sh` starts Phase 2 after real cache and parity readiness checks.
 - `scripts/evaluate.py` scores prediction JSONL files against eval configs and writes accuracy reports.
 
 ## Latest Local Smoke
@@ -115,7 +120,57 @@ cached Phase 1 gate, not real paper training.
 
 - `Qwen3-VL-4B-Instruct`: present at `/mnt/guojh/lq/new/weights/base_models/Qwen3-VL-4B-Instruct` (`8.3G`).
 - `VGGT-1B`: present at `/mnt/guojh/lq/new/weights/base_models/VGGT-1B` (`9.4G`).
-- Current server `transformers==4.50.0`; Qwen3-VL bridge inspection is gated until a Qwen3-VL-compatible Transformers build is installed or vendored.
+- Shared conda env still has `transformers==4.50.0`; GeoWire uses project-local overlay
+  `/mnt/guojh/lq/new/GeoWire/.deps/transformers_4_57_6` for Qwen3-VL.
+- VGGT source is present at `/mnt/guojh/lq/new/GeoWire/third_party/vggt`, commit `a288dd0`.
+
+## Latest Real Backend Gate
+
+Server path:
+
+```text
+/mnt/guojh/lq/new/GeoWire/geowire
+```
+
+Real cache smoke:
+
+```text
+manifest: assets/real_backend_smoke_scene/manifest.jsonl
+cache: runs/real_backend_smoke_cache
+backend: real
+semantic tokens: runs/real_backend_smoke_cache/toy_scene_clip_000/semantic_tokens.safetensors
+geometry: runs/real_backend_smoke_cache/toy_scene_clip_000/geometry.safetensors
+graph: track_edges=32, projective_edges=138, self_edges=160
+phase1 readiness: passed with --require-real-cache and min_cross_frame_coverage=0.01
+```
+
+Real Phase 1 training smoke:
+
+```text
+output: runs/real_backend_phase1_tip_smoke
+steps: 2
+checkpoint: runs/real_backend_phase1_tip_smoke/geowire_adapter.pt
+eval_random_graph_gap: 0.02674686908721924
+eval_shuffled_graph_gap: 0.04390311241149902
+```
+
+Qwen bridge parity:
+
+```text
+report: runs/qwen_bridge_parity/real_backend_smoke_report.json
+passed: true
+max_abs_logit_diff: 0.0
+```
+
+Real Phase 2 SFT smoke:
+
+```text
+output: runs/phase2_sft_smoke_real_backend_4step
+schedule: 3 QA steps then 1 TIP step
+final step: 4
+final mode: tip
+phase2_adapters.pt written
+```
 
 ## Phase 1 Launch Template
 
@@ -142,8 +197,9 @@ python scripts/evaluate.py \
   --write runs/eval/report.json
 ```
 
-## Gated Before Real Training
+## Gated Before Full Real Training
 
-- Real VGGT cache generation requires pinned `third_party/vggt`, VGGT-1B weights and visual graph audit.
-- Qwen3-VL bridge still requires installed compatible Transformers/Qwen3-VL source inspection and alpha=0 parity.
-- Phase 2 SFT remains blocked until Phase 1 diagnostics prove full graph beats random/shuffled controls.
+- Full training manifests must be built from the real SPAR/LLaVA-Hound/XVR pools with scene-level leakage audit.
+- Graph thresholds must be calibrated on real clips with visual overlay audit; the smoke used loose thresholds only to verify the engineering path.
+- Phase 1 should not advance to paper Phase 2 claims until full graph beats self/random/shuffled controls on a real validation subset.
+- Benchmark generation wrappers still need real prediction runs for VSI/MMSI/ViewSpatial; the scorer already exists.

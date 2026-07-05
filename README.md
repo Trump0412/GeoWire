@@ -39,6 +39,19 @@ training entrypoint can run on an idle A100 and save metrics/checkpoints. It is
 not claimed as real GeoWire paper training until real VGGT/Qwen caches and
 bridge parity pass.
 
+Latest real-backend server gates:
+
+```text
+real cache smoke: runs/real_backend_smoke_cache
+real graph smoke: track_edges=32, projective_edges=138, self_edges=160
+phase1 real smoke: runs/real_backend_phase1_tip_smoke, steps=2
+qwen bridge parity: runs/qwen_bridge_parity/real_backend_smoke_report.json, max_abs_logit_diff=0.0
+phase2 real smoke: runs/phase2_sft_smoke_real_backend_4step, schedule QA/QA/QA/TIP
+```
+
+Full training now depends on real manifests/cache scale-up plus graph visual
+audit and threshold calibration, not on missing code stubs.
+
 ## Phase 1 Launch
 
 Once real manifests and cache files are ready:
