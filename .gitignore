@@ -13,6 +13,7 @@ venv/
 runs/
 geowire/runs/
 geowire/assets/toy_scene/
+geowire/assets/*_smoke_scene/
 
 # Large local resources must stay outside Git
 /data/
