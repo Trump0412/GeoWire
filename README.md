@@ -19,8 +19,9 @@ python scripts/smoke_all.py --output runs/smoke_local
 
 The smoke path intentionally uses a synthetic toy cache. It verifies software
 plumbing only: environment report, coordinate contract, toy cache, sparse graph,
-cached TIP training, and unit tests. Real VGGT/Qwen training remains gated behind
-resource inspection, graph overlays, and Qwen bridge parity.
+cached TIP training, prediction-file evaluation, and unit tests. Real VGGT/Qwen
+training remains gated behind resource inspection, graph overlays, and Qwen
+bridge parity.
 
 ## Phase 1 Launch
 

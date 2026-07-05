@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -98,6 +99,29 @@ def main() -> None:
             str(args.output / "tip_debug"),
             "--steps",
             "2",
+        ]
+    )
+    pred_path = args.output / "toy_predictions.jsonl"
+    pred_path.write_text(
+        "\n".join(
+            [
+                json.dumps({"id": "toy_0", "prediction": "A", "answer": "A"}),
+                json.dumps({"id": "toy_1", "prediction": "B", "answer": "C"}),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    run(
+        [
+            py,
+            "scripts/evaluate.py",
+            "--config",
+            "configs/eval_vsi.yaml",
+            "--predictions",
+            str(pred_path),
+            "--write",
+            str(args.output / "eval_report.json"),
         ]
     )
     if not args.skip_tests:

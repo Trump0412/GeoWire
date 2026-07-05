@@ -13,11 +13,12 @@ python scripts/smoke_all.py --output runs/smoke_local
 Observed result:
 
 ```text
-24 passed, 1 skipped
+29 passed, 1 skipped
 coordinate contract passed
 toy cache generated
 toy sparse graph normalized
-TIP debug metrics written
+cached TIP checkpoint written
+prediction JSONL evaluator wrote an eval report
 ```
 
 The same cached Phase 1 smoke passed on the server at
@@ -43,6 +44,7 @@ checkpoint: runs/smoke_cached_phase1_server/tip_debug/geowire_adapter.pt
 - Self-loop/random/shuffled graph controls.
 - Cached Phase 1 training loop with checkpoint and metrics output.
 - Phase 1 readiness check and tmux launcher.
+- Prediction JSONL evaluator with benchmark config/normalizer recording.
 
 ## Still Gated
 

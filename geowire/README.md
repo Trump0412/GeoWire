@@ -71,6 +71,7 @@ Implemented now:
 - TIP v0.2 debug losses and graph controls;
 - cached Phase 1 TIP training entrypoint;
 - Phase 1 readiness and tmux launch scripts;
+- prediction JSONL evaluator for benchmark reports;
 - leakage audit;
 - Qwen/VGGT inspection and resource download entrypoints.
 

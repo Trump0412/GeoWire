@@ -12,11 +12,12 @@ Status: software smoke passed locally on 2026-07-06.
 Latest local smoke:
 
 ```text
-26 passed, 1 skipped
+29 passed, 1 skipped
 toy cache generated
 toy graph normalized
 phase1 readiness passed on toy cache
 cached TIP checkpoint written
+prediction JSONL evaluator wrote an eval report
 coordinate roundtrip max error < 0.5 px
 ```
 

@@ -26,6 +26,7 @@ Last updated: 2026-07-06
 - Cached Phase 1 entrypoint can train GeoWire from `manifest + cache_root`, saving `geowire_adapter.pt`, `metrics.jsonl`, `metrics.json` and `trainer_state.json`.
 - `scripts/check_training_readiness.py` validates Phase 1 cache completeness.
 - `scripts/launch_phase1_tip_tmux.sh` starts Phase 1 in tmux after readiness checks.
+- `scripts/evaluate.py` scores prediction JSONL files against eval configs and writes accuracy reports.
 
 ## Latest Local Smoke
 
@@ -39,10 +40,11 @@ python scripts/smoke_all.py --output runs/smoke_local
 Result:
 
 ```text
-26 passed, 1 skipped
+29 passed, 1 skipped
 coordinate contract passed
 toy graph row sums min/max = 1.0 / 1.0
 cached TIP checkpoint written
+eval report written with toy accuracy = 0.5
 ```
 
 ## Latest Server Smoke
@@ -89,6 +91,17 @@ CACHE_ROOT=/mnt/guojh/lq/new/cache/geowire/phase1 \
 STEPS=30000 \
 SESSION=geowire_phase1_tip \
 ./scripts/launch_phase1_tip_tmux.sh
+```
+
+## Evaluation Entry
+
+Given a prediction JSONL with at least `prediction` and `answer` fields:
+
+```bash
+python scripts/evaluate.py \
+  --config configs/eval_vsi.yaml \
+  --predictions /path/to/predictions.jsonl \
+  --write runs/eval/report.json
 ```
 
 ## Gated Before Real Training
