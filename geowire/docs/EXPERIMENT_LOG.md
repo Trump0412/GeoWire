@@ -33,6 +33,25 @@ cached tip checkpoint: runs/smoke_eval_server/tip_debug/geowire_adapter.pt
 eval report: runs/smoke_eval_server/eval_report.json
 ```
 
+Server step50 engineering gate:
+
+```text
+date: 2026-07-06
+path: /mnt/guojh/lq/new/GeoWire/geowire
+python: /mnt/guojh/lq/new/conda/envs/geothinker/bin/python
+gpu: CUDA_VISIBLE_DEVICES=6
+manifest: assets/toy_scene/manifest.jsonl
+cache: runs/step50_toy_cache
+output: runs/phase1_tip_step50_gpu6
+result: completed step 50
+checkpoint: runs/phase1_tip_step50_gpu6/geowire_adapter.pt
+metrics: runs/phase1_tip_step50_gpu6/metrics.json
+loss: 0.6762770414352417
+eval_full_rec: 0.6607329845428467
+eval_random_graph_gap: 0.15737617015838623
+eval_shuffled_graph_gap: 0.2560940384864807
+```
+
 Qwen3-VL inspection:
 
 ```text

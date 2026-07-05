@@ -75,6 +75,42 @@ eval report written:
 /mnt/guojh/lq/new/GeoWire/geowire/runs/smoke_eval_server/eval_report.json
 ```
 
+## Latest Server Step50 Training Gate
+
+Path:
+
+```text
+/mnt/guojh/lq/new/GeoWire/geowire
+```
+
+Command:
+
+```bash
+CUDA_VISIBLE_DEVICES=6 \
+/mnt/guojh/lq/new/conda/envs/geothinker/bin/python scripts/train_tip.py \
+  --manifest assets/toy_scene/manifest.jsonl \
+  --cache-root runs/step50_toy_cache \
+  --output runs/phase1_tip_step50_gpu6 \
+  --steps 50 \
+  --device cuda
+```
+
+Result:
+
+```text
+completed step: 50
+output: runs/phase1_tip_step50_gpu6
+checkpoint: runs/phase1_tip_step50_gpu6/geowire_adapter.pt
+metrics: runs/phase1_tip_step50_gpu6/metrics.json
+loss: 0.6762770414352417
+eval_full_rec: 0.6607329845428467
+eval_random_graph_gap: 0.15737617015838623
+eval_shuffled_graph_gap: 0.2560940384864807
+```
+
+This validates the software training loop on an idle A100. It remains a toy
+cached Phase 1 gate, not real paper training.
+
 ## Server Resource Check
 
 - `Qwen3-VL-4B-Instruct`: present at `/mnt/guojh/lq/new/weights/base_models/Qwen3-VL-4B-Instruct` (`8.3G`).

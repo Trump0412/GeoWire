@@ -23,6 +23,22 @@ cached TIP training, prediction-file evaluation, and unit tests. Real VGGT/Qwen
 training remains gated behind resource inspection, graph overlays, and Qwen
 bridge parity.
 
+Latest server software-training check:
+
+```text
+2026-07-06
+server: /mnt/guojh/lq/new/GeoWire/geowire
+gpu: CUDA_VISIBLE_DEVICES=6
+output: runs/phase1_tip_step50_gpu6
+result: cached Phase 1 TIP toy run completed step 50
+checkpoint: runs/phase1_tip_step50_gpu6/geowire_adapter.pt
+```
+
+This is the current step50 engineering gate. It proves that the cached Phase 1
+training entrypoint can run on an idle A100 and save metrics/checkpoints. It is
+not claimed as real GeoWire paper training until real VGGT/Qwen caches and
+bridge parity pass.
+
 ## Phase 1 Launch
 
 Once real manifests and cache files are ready:
