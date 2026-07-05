@@ -20,8 +20,14 @@ toy sparse graph normalized
 TIP debug metrics written
 ```
 
-The same smoke passed on the server at `/mnt/guojh/lq/new/GeoWire/geowire`
-with `/mnt/guojh/lq/new/conda/envs/geothinker/bin/python`.
+The same cached Phase 1 smoke passed on the server at
+`/mnt/guojh/lq/new/GeoWire/geowire` with
+`/mnt/guojh/lq/new/conda/envs/geothinker/bin/python`.
+
+```text
+26 passed, 1 skipped
+checkpoint: runs/smoke_cached_phase1_server/tip_debug/geowire_adapter.pt
+```
 
 ## Done
 

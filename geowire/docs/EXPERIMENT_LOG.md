@@ -25,8 +25,10 @@ Server smoke:
 ```text
 path: /mnt/guojh/lq/new/GeoWire/geowire
 python: /mnt/guojh/lq/new/conda/envs/geothinker/bin/python
-result: 24 passed, 1 skipped
+result: 26 passed, 1 skipped
 gpu: 8 x A100 80GB visible
+phase1 readiness: passed on toy cache
+cached tip checkpoint: runs/smoke_cached_phase1_server/tip_debug/geowire_adapter.pt
 ```
 
 Qwen3-VL inspection:
