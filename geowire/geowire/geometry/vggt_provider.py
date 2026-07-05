@@ -91,15 +91,17 @@ class VGGTProvider:
             predictions = model(images)
         pose_enc = predictions["pose_enc"]
         extrinsic, intrinsic = pose_encoding_to_extri_intri(pose_enc, images.shape[-2:])
-        depth = predictions["depth"].squeeze(0).squeeze(-1).float()
+        depth_raw = predictions["depth"].squeeze(0).float()
+        depth = depth_raw.squeeze(-1)
         depth_conf = predictions["depth_conf"].squeeze(0).float()
         world_points_head = predictions["world_points"].squeeze(0).float()
         point_conf = predictions["world_points_conf"].squeeze(0).float()
         world_points_unproj = unproject_depth_map_to_point_map(
-            depth,
+            depth_raw,
             extrinsic.squeeze(0).float(),
             intrinsic.squeeze(0).float(),
         )
+        world_points_unproj = torch.as_tensor(world_points_unproj, dtype=torch.float32)
         return VGGTGeometry(
             extrinsic_cw=extrinsic.squeeze(0).detach().cpu().float(),
             intrinsic=intrinsic.squeeze(0).detach().cpu().float(),
