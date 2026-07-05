@@ -152,7 +152,7 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
     write_jsonl(args.output / "metrics.jsonl", rows)
     final = {"steps": args.steps, "output": str(args.output), "final": rows[-1] if rows else {}}
     write_json(args.output / "metrics.json", final)
-    write_json(args.output / "trainer_state.json", vars(args))
+    write_json(args.output / "trainer_state.json", {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()})
     return final
 
 
