@@ -26,8 +26,9 @@ The same cached Phase 1 smoke passed on the server at
 `/mnt/guojh/lq/new/conda/envs/geothinker/bin/python`.
 
 ```text
-26 passed, 1 skipped
-checkpoint: runs/smoke_cached_phase1_server/tip_debug/geowire_adapter.pt
+29 passed, 1 skipped
+checkpoint: runs/smoke_eval_server/tip_debug/geowire_adapter.pt
+eval report: runs/smoke_eval_server/eval_report.json
 ```
 
 ## Done

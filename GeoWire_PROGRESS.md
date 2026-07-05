@@ -65,12 +65,14 @@ cd /mnt/guojh/lq/new/GeoWire/geowire
 Result:
 
 ```text
-26 passed, 1 skipped
+29 passed, 1 skipped
 8 x A100 80GB visible
 toy graph row sums min/max = 1.0 / 1.0
 phase1 readiness passed
 cached TIP checkpoint written:
-/mnt/guojh/lq/new/GeoWire/geowire/runs/smoke_cached_phase1_server/tip_debug/geowire_adapter.pt
+/mnt/guojh/lq/new/GeoWire/geowire/runs/smoke_eval_server/tip_debug/geowire_adapter.pt
+eval report written:
+/mnt/guojh/lq/new/GeoWire/geowire/runs/smoke_eval_server/eval_report.json
 ```
 
 ## Server Resource Check
