@@ -6,7 +6,7 @@ import torch
 from safetensors.torch import load_file, save_file
 
 from geowire.constants import CACHE_SCHEMA, DEFAULT_QWEN_CHECKPOINT, DEFAULT_VGGT_CHECKPOINT
-from geowire.types import FrameTransform, TokenLayout
+from geowire.types import Affine2D, FrameTransform, TokenLayout, VGGTGeometry
 from geowire.utils.io import read_json
 from geowire.utils.io import write_json
 
@@ -42,6 +42,29 @@ def frame_transform_to_dict(ft: FrameTransform) -> dict:
         "valid_qwen_rect_xyxy": ft.valid_qwen_rect_xyxy,
         "valid_vggt_rect_xyxy": ft.valid_vggt_rect_xyxy,
     }
+
+
+def frame_transform_from_dict(data: dict) -> FrameTransform:
+    return FrameTransform(
+        frame_id=int(data["frame_id"]),
+        raw_size_wh=tuple(data["raw_size_wh"]),
+        qwen_size_wh=tuple(data["qwen_size_wh"]),
+        vggt_size_wh=tuple(data["vggt_size_wh"]),
+        raw_to_qwen=Affine2D(torch.tensor(data["raw_to_qwen"], dtype=torch.float64)),
+        qwen_to_raw=Affine2D(torch.tensor(data["qwen_to_raw"], dtype=torch.float64)),
+        raw_to_vggt=Affine2D(torch.tensor(data["raw_to_vggt"], dtype=torch.float64)),
+        vggt_to_raw=Affine2D(torch.tensor(data["vggt_to_raw"], dtype=torch.float64)),
+        valid_qwen_rect_xyxy=tuple(float(x) for x in data["valid_qwen_rect_xyxy"]),
+        valid_vggt_rect_xyxy=tuple(float(x) for x in data["valid_vggt_rect_xyxy"]),
+    )
+
+
+def save_frame_transforms(path: str | Path, frame_transforms: tuple[FrameTransform, ...]) -> None:
+    write_json(path, [frame_transform_to_dict(ft) for ft in frame_transforms])
+
+
+def load_frame_transforms(path: str | Path) -> tuple[FrameTransform, ...]:
+    return tuple(frame_transform_from_dict(item) for item in read_json(path))
 
 
 def save_token_layout(path: str | Path, layout: TokenLayout) -> None:
@@ -96,3 +119,50 @@ def load_semantic_tokens(path: str | Path) -> torch.Tensor:
     if hidden.ndim != 2:
         raise ValueError("cached hidden tensor must be [N, D]")
     return hidden
+
+
+def save_vggt_geometry(path: str | Path, geometry: VGGTGeometry) -> None:
+    """Save frozen VGGT geometry tensors for Phase 0 graph construction."""
+
+    tensors = {
+        "extrinsic_cw": geometry.extrinsic_cw.detach().cpu().float(),
+        "intrinsic": geometry.intrinsic.detach().cpu().float(),
+        "depth": geometry.depth.detach().cpu().float(),
+        "depth_conf": geometry.depth_conf.detach().cpu().float(),
+        "world_points_head": geometry.world_points_head.detach().cpu().float(),
+        "world_points_unproj": geometry.world_points_unproj.detach().cpu().float(),
+        "point_conf": geometry.point_conf.detach().cpu().float(),
+    }
+    optional = {
+        "track_xy": geometry.track_xy,
+        "track_vis": geometry.track_vis,
+        "track_conf": geometry.track_conf,
+        "track_anchor_frames": geometry.track_anchor_frames,
+        "track_query_token_ids": geometry.track_query_token_ids,
+    }
+    for name, value in optional.items():
+        if value is not None:
+            tensors[name] = value.detach().cpu()
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    save_file(tensors, str(path))
+
+
+def load_vggt_geometry(cache_dir: str | Path) -> VGGTGeometry:
+    cache_dir = Path(cache_dir)
+    data = load_file(str(cache_dir / "geometry.safetensors"))
+    frame_transforms = load_frame_transforms(cache_dir / "frame_transforms.json")
+    return VGGTGeometry(
+        extrinsic_cw=data["extrinsic_cw"].float(),
+        intrinsic=data["intrinsic"].float(),
+        depth=data["depth"].float(),
+        depth_conf=data["depth_conf"].float(),
+        world_points_head=data["world_points_head"].float(),
+        world_points_unproj=data["world_points_unproj"].float(),
+        point_conf=data["point_conf"].float(),
+        frame_transforms=frame_transforms,
+        track_xy=data.get("track_xy"),
+        track_vis=data.get("track_vis"),
+        track_conf=data.get("track_conf"),
+        track_anchor_frames=data.get("track_anchor_frames"),
+        track_query_token_ids=data.get("track_query_token_ids"),
+    )

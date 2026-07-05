@@ -9,14 +9,22 @@ CACHE_ROOT="${CACHE_ROOT:?set CACHE_ROOT to a GeoWire cache root}"
 OUTPUT_DIR="${OUTPUT_DIR:-${PROJECT_ROOT}/runs/phase1_tip_$(date +%Y%m%d_%H%M%S)}"
 STEPS="${STEPS:-30000}"
 DEVICE="${DEVICE:-cuda}"
+REQUIRE_REAL_CACHE="${REQUIRE_REAL_CACHE:-1}"
+MIN_CROSS_FRAME_COVERAGE="${MIN_CROSS_FRAME_COVERAGE:-0.01}"
 
 cd "${PROJECT_ROOT}"
 mkdir -p "${OUTPUT_DIR}" logs/tmux
+
+READINESS_ARGS=()
+if [[ "${REQUIRE_REAL_CACHE}" == "1" ]]; then
+  READINESS_ARGS+=(--require-real-cache --min-cross-frame-coverage "${MIN_CROSS_FRAME_COVERAGE}")
+fi
 
 "${PYTHON_BIN}" scripts/check_training_readiness.py \
   --phase phase1 \
   --manifest "${MANIFEST}" \
   --cache-root "${CACHE_ROOT}" \
+  "${READINESS_ARGS[@]}" \
   --write "${OUTPUT_DIR}/readiness.json"
 
 if tmux has-session -t "${SESSION}" 2>/dev/null; then

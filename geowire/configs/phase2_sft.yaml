@@ -6,17 +6,32 @@ model:
   freeze_vision: true
   train_visual_merger_lora: true
   train_language_lora: true
+  phase1_checkpoint: /mnt/guojh/lq/new/GeoWire/geowire/runs/phase1_tip/geowire_adapter.pt
+
+data:
+  qa_manifest: /mnt/guojh/lq/new/datasets/geowire/phase2_core_clean.jsonl
+  tip_manifest: /mnt/guojh/lq/new/datasets/geowire/phase1_train.jsonl
+  cache_root: /mnt/guojh/lq/new/cache/geowire/phase1
 
 lora:
   r: 32
   alpha: 64
   dropout: 0.05
-  target_modules: auto_from_inspection
+  target_modules:
+    - q_proj
+    - k_proj
+    - v_proj
+    - o_proj
+    - gate_proj
+    - up_proj
+    - down_proj
 
 tip:
-  lambda_rec: 0.20
-  lambda_sub: 0.05
-  lambda_iso: 0.02
+  qa_to_tip_batch_ratio: 3:1
+  lambda_tip_effective: 0.20
+  lambda_sub: 0.25
+  lambda_keep: 0.02
+  mask_ratio: 0.15
 
 train:
   per_device_batch_size: 1
@@ -30,3 +45,4 @@ train:
 
 runtime:
   output_dir: runs/phase2_sft
+  parity_report: runs/qwen_bridge_parity/report.json

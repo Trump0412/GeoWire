@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 from importlib.metadata import version
 from pathlib import Path
@@ -32,11 +33,11 @@ def main() -> None:
         report["transformers_support"] = f"failed: {exc}"
 
     if args.load_model:
-        from transformers import AutoConfig, AutoModelForVision2Seq, AutoProcessor
+        from transformers import AutoConfig, AutoModelForImageTextToText, AutoProcessor
 
         cfg = AutoConfig.from_pretrained(args.checkpoint, trust_remote_code=True)
         proc = AutoProcessor.from_pretrained(args.checkpoint, trust_remote_code=True)
-        model = AutoModelForVision2Seq.from_pretrained(
+        model = AutoModelForImageTextToText.from_pretrained(
             args.checkpoint,
             trust_remote_code=True,
             device_map="cpu",
@@ -45,11 +46,20 @@ def main() -> None:
         report["config_class"] = cfg.__class__.__name__
         report["processor_class"] = proc.__class__.__name__
         report["model_class"] = model.__class__.__name__
-        report["candidate_module_names"] = [
-            name
-            for name, _module in model.named_modules()
-            if any(k in name.lower() for k in ("visual", "vision", "merger", "projector", "language"))
-        ][:300]
+        report["model_source"] = inspect.getsourcefile(model.__class__)
+        report["vision_module_class"] = model.visual.__class__.__name__ if hasattr(model, "visual") else None
+        report["spatial_merge_size"] = getattr(getattr(model, "visual", None), "spatial_merge_size", None)
+        candidates = {}
+        for name, module in model.named_modules():
+            if any(k in name.lower() for k in ("visual", "vision", "merger", "projector", "language")):
+                try:
+                    sig = str(inspect.signature(module.forward))
+                except (TypeError, ValueError):
+                    sig = "<unavailable>"
+                candidates[name] = f"{module.__class__.__name__}{sig}"
+                if len(candidates) >= 300:
+                    break
+        report["candidate_modules"] = candidates
 
     text = json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True)
     print(text)

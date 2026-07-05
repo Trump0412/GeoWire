@@ -14,7 +14,9 @@ from geowire.data.manifest import load_manifest
 from geowire.geometry.graph_builder import EdgeCandidates, build_graph
 from geowire.geometry.graph_io import save_graph_npz
 from geowire.geometry.graph_stats import graph_stats
-from geowire.geometry.vggt_cache import load_token_layout
+from geowire.geometry.projective_edges import projective_edge_candidates
+from geowire.geometry.track_queries import track_edge_candidates
+from geowire.geometry.vggt_cache import load_token_layout, load_vggt_geometry, read_cache_metadata
 from geowire.utils.io import write_json
 
 
@@ -67,20 +69,37 @@ def toy_layout_edges(cache_dir: Path) -> tuple[int, EdgeCandidates, torch.Tensor
     )
 
 
-def build_from_manifest(manifest: Path, cache_root: Path, output: Path) -> None:
+def build_real_or_toy_edges(cache_dir: Path) -> tuple[int, list[EdgeCandidates], torch.Tensor, str]:
+    layout = load_token_layout(cache_dir / "token_layout.safetensors")
+    metadata = read_cache_metadata(cache_dir)
+    if (cache_dir / "geometry.safetensors").exists() and metadata.get("backend") == "real":
+        geometry = load_vggt_geometry(cache_dir)
+        candidates = [
+            track_edge_candidates(layout, geometry),
+            projective_edge_candidates(layout, geometry),
+        ]
+        return int(layout.frame_index.numel()), candidates, layout.frame_index, "real"
+    num_nodes, toy_candidates, frame_index = toy_layout_edges(cache_dir)
+    return num_nodes, [toy_candidates], frame_index, "toy"
+
+
+def build_from_manifest(manifest: Path, cache_root: Path, output: Path, *, topk: int) -> None:
     records = load_manifest(manifest)
     summaries: dict[str, dict[str, float | int]] = {}
     for record in records:
         clip_cache = cache_root / record.clip_id
-        num_nodes, candidates, frame_index = toy_layout_edges(clip_cache)
+        num_nodes, candidates, frame_index, backend = build_real_or_toy_edges(clip_cache)
         graph = build_graph(
             num_nodes,
-            [candidates],
+            candidates,
             frame_index=frame_index,
-            topk_cross_frame_edges=4,
+            topk_cross_frame_edges=topk,
         )
         save_graph_npz(clip_cache / "graph_coo.npz", graph)
-        summaries[record.clip_id] = graph_stats(graph)
+        summary = graph_stats(graph)
+        summary["graph_backend"] = backend
+        summaries[record.clip_id] = summary
+        write_json(clip_cache / "debug" / "graph_stats.json", summary)
     write_json(output / "graph_summary.json", summaries)
     print(output)
 
@@ -90,13 +109,14 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("runs/phase0_graph"))
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--cache-root", type=Path)
+    parser.add_argument("--topk-cross-frame", type=int, default=4)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
 
     if args.manifest:
         if not args.cache_root:
             raise SystemExit("--cache-root is required with --manifest")
-        build_from_manifest(args.manifest, args.cache_root, args.output)
+        build_from_manifest(args.manifest, args.cache_root, args.output, topk=args.topk_cross_frame)
         return
 
     num_nodes = 8

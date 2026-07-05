@@ -12,7 +12,7 @@ tip:
   min_cross_frame_neighbors: 1
   lambda_rec: 1.0
   lambda_sub: 0.25
-  lambda_iso: 0.10
+  lambda_keep: 0.02
   lambda_perm: 0.0
 
 train:
