@@ -1,0 +1,3 @@
+manifest: /mnt/guojh/lq/new/datasets/manifests/benchmark_only.jsonl
+cache_root: /mnt/guojh/lq/new/cache/geowire/benchmark_only
+split: test

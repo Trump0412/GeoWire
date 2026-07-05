@@ -1,0 +1,9 @@
+transformers
+accelerate
+peft
+deepspeed
+qwen-vl-utils
+hydra-core
+omegaconf
+wandb
+tensorboard

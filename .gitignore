@@ -1,0 +1,36 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.cache/
+.venv/
+venv/
+
+# Generated run artifacts and local smoke outputs
+runs/
+geowire/runs/
+geowire/assets/toy_scene/
+
+# Large local resources must stay outside Git
+/data/
+/datasets/
+/weights/
+/checkpoints/
+/outputs/
+third_party/vggt/
+geowire/third_party/vggt/
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.tar
+*.tar.gz
+*.zip
+
+# Local machine/editor state
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,32 @@
+defaults:
+  - phase1_tip
+
+model:
+  qwen_bridge: true
+  freeze_vision: true
+  train_visual_merger_lora: true
+  train_language_lora: true
+
+lora:
+  r: 32
+  alpha: 64
+  dropout: 0.05
+  target_modules: auto_from_inspection
+
+tip:
+  lambda_rec: 0.20
+  lambda_sub: 0.05
+  lambda_iso: 0.02
+
+train:
+  per_device_batch_size: 1
+  gradient_accumulation_steps: 16
+  max_steps: 12000
+  lr_geowire: 0.0001
+  lr_lora: 0.00002
+  weight_decay: 0.01
+  warmup_ratio: 0.03
+  deepspeed: configs/deepspeed_zero2.json
+
+runtime:
+  output_dir: runs/phase2_sft

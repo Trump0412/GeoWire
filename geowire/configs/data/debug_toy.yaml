@@ -1,0 +1,3 @@
+manifest: assets/toy_scene/manifest.jsonl
+cache_root: runs/toy_cache
+split: train

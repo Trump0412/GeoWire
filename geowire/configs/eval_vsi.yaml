@@ -1,0 +1,12 @@
+benchmark_name: vsi_bench_debiased
+data_root: /mnt/guojh/lq/new/datasets/benchmarks/VSI-Bench
+sampling:
+  num_frames: 8
+  strategy: uniform
+  include_first_last: true
+  max_frames: 32
+prompt_template_id: vsi_default
+answer_normalizer_id: spatial_choice
+model_generation_kwargs:
+  max_new_tokens: 64
+  do_sample: false

@@ -1,0 +1,31 @@
+name: geowire
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - pytorch>=2.5
+  - torchvision
+  - pytorch-cuda=12.4
+  - pip:
+      - transformers
+      - accelerate
+      - peft
+      - deepspeed
+      - safetensors
+      - huggingface_hub
+      - qwen-vl-utils
+      - einops
+      - hydra-core
+      - omegaconf
+      - pyarrow
+      - pillow
+      - opencv-python-headless
+      - matplotlib
+      - pytest
+      - ruff
+      - mypy
+      - tensorboard
+      - wandb

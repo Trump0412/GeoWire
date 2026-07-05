@@ -1,0 +1,1 @@
+"""Geometry and graph construction."""

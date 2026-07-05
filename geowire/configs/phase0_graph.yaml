@@ -1,0 +1,15 @@
+defaults:
+  - base
+  - data: debug_toy
+
+runtime:
+  output_dir: runs/phase0_graph
+
+geometry:
+  track_anchor_strategy: uniform_m
+  num_track_anchors: 3
+  use_unprojected_points: true
+
+visualization:
+  num_cases: 100
+  save_overlay: true

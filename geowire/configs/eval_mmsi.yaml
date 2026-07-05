@@ -1,0 +1,12 @@
+benchmark_name: mmsi_bench
+data_root: /mnt/guojh/lq/new/datasets/benchmarks/MMSI_Bench
+sampling:
+  num_frames: 8
+  strategy: benchmark_official
+  include_first_last: false
+  max_frames: 16
+prompt_template_id: mmsi_default
+answer_normalizer_id: spatial_choice
+model_generation_kwargs:
+  max_new_tokens: 64
+  do_sample: false

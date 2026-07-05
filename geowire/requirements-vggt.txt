@@ -1,0 +1,4 @@
+vggt
+safetensors
+opencv-python-headless
+matplotlib

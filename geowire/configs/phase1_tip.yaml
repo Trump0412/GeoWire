@@ -1,0 +1,32 @@
+defaults:
+  - phase0_graph
+
+model:
+  freeze_vision: true
+  geowire_blocks: 2
+  geowire_dropout: 0.0
+
+tip:
+  enabled: true
+  mask_ratio: 0.15
+  min_cross_frame_neighbors: 1
+  lambda_rec: 1.0
+  lambda_sub: 0.25
+  lambda_iso: 0.10
+  lambda_perm: 0.0
+
+train:
+  precision: bf16
+  per_device_batch_size: 4
+  gradient_accumulation_steps: 4
+  max_steps: 30000
+  lr: 0.0002
+  weight_decay: 0.05
+  warmup_ratio: 0.05
+  num_workers: 8
+  log_every: 20
+  eval_every: 500
+  save_every: 1000
+
+runtime:
+  output_dir: runs/phase1_tip
