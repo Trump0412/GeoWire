@@ -214,6 +214,19 @@ final loss: 0.5104734301567078
 adapter: runs/node218_phase2_sft_torchrun8_smoke/phase2_adapters.pt
 ```
 
+Node218 Phase 2 ZeRO-2 smoke:
+
+```text
+output: runs/node218_phase2_sft_zero2_torchrun2_smoke
+world_size: 2
+deepspeed_config: configs/deepspeed_zero2.json
+deepspeed_enabled: true
+final step: 4
+final mode: tip
+final loss: 0.5078125
+adapter: runs/node218_phase2_sft_zero2_torchrun2_smoke/phase2_adapters.pt
+```
+
 Current resource note: GPUs 0-5 were free after the smoke, while GPUs 6-7 were
 occupied by an unrelated job. Use six cards now, or switch to all eight when 6-7
 are released.

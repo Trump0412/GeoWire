@@ -49,7 +49,10 @@ def init_distributed(device_arg: str) -> DistributedContext:
 
 def barrier(ctx: DistributedContext) -> None:
     if ctx.enabled:
-        torch_dist.barrier()
+        if ctx.device.type == "cuda":
+            torch_dist.barrier(device_ids=[ctx.local_rank])
+        else:
+            torch_dist.barrier()
 
 
 def cleanup(ctx: DistributedContext) -> None:

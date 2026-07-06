@@ -121,3 +121,19 @@ phase2 8-gpu final mode: tip
 phase2 8-gpu final_loss: 0.5104734301567078
 note: GPUs 6-7 were occupied by an unrelated job after the smoke; use GPUs 0-5 until they are free
 ```
+
+Node218 ZeRO-2 Phase 2 smoke:
+
+```text
+date: 2026-07-07
+host: 10.99.8.18
+command: torch.distributed.run --standalone --nproc_per_node=2 scripts/train_sft.py --deepspeed-config configs/deepspeed_zero2.json
+output: runs/node218_phase2_sft_zero2_torchrun2_smoke
+world_size: 2
+deepspeed_enabled: true
+schedule: QA, QA, QA, TIP
+final_step: 4
+final_mode: tip
+final_loss: 0.5078125
+adapter: runs/node218_phase2_sft_zero2_torchrun2_smoke/phase2_adapters.pt
+```
