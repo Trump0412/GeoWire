@@ -171,11 +171,13 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
         if use_tip:
             record = tip_records[((step // (qa_to_tip + 1)) * dist.world_size + dist.rank) % len(tip_records)]
             clip_dir = args.cache_root / record.clip_id
-            clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(device)
+            tip_model = train_model.module.geowire if use_deepspeed else geowire
+            tip_dtype = next(tip_model.parameters()).dtype
+            clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(device=device, dtype=tip_dtype)
             layout = load_token_layout(clip_dir / "token_layout.safetensors")
             graph = graph_to_device(load_graph_npz(clip_dir / "graph_coo.npz"), device)
             loss, metrics = tip_loss_step(
-                train_model.module.geowire if use_deepspeed else geowire,
+                tip_model,
                 clean,
                 graph,
                 layout.frame_index.to(device),
