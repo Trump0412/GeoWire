@@ -42,18 +42,21 @@ def sample_tip_targets(
     eligible = torch.nonzero(cross_frame_neighbor_mask(graph, frame_index), as_tuple=False).flatten()
     if eligible.numel() == 0:
         return TIPTargets(masked_node_ids=torch.empty(0, dtype=torch.long), equivalent_support_groups=())
+    frame_index_cpu = frame_index.detach().cpu()
+    dst_cpu = graph.dst.detach().cpu()
+    src_cpu = graph.src.detach().cpu()
     count = max(min_masked, int(round(float(eligible.numel()) * mask_ratio)))
     count = min(count, int(eligible.numel()))
     order = torch.randperm(eligible.numel(), generator=generator)
     masked = eligible[order[:count]].to(torch.long)
     groups: list[tuple[torch.Tensor, torch.Tensor]] = []
     for dst in masked.tolist():
-        idx = torch.nonzero(graph.dst.cpu() == dst, as_tuple=False).flatten()
-        src = graph.src.cpu()[idx]
+        idx = torch.nonzero(dst_cpu == dst, as_tuple=False).flatten()
+        src = src_cpu[idx]
         src = src[src != dst]
         if src.numel() < 2:
             continue
-        source_frames = frame_index[src]
+        source_frames = frame_index_cpu[src]
         unique_frames = torch.unique(source_frames)
         if unique_frames.numel() < 2:
             continue
