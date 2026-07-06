@@ -75,6 +75,7 @@ default while GPUs 6-7 are occupied by another job:
 cd /mnt/guojh/lq/new/GeoWire/geowire
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 \
 NPROC_PER_NODE=6 \
+DEEPSPEED_CONFIG=./configs/deepspeed_zero2.json \
 QA_MANIFEST=/path/to/phase2_qa_manifest.jsonl \
 TIP_MANIFEST=/path/to/phase2_tip_manifest.jsonl \
 CACHE_ROOT=/mnt/guojh/lq/new/cache/geowire/phase2 \
@@ -84,8 +85,9 @@ PARITY_REPORT=/path/to/passing_parity_report.json \
 ```
 
 Use `CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 NPROC_PER_NODE=8` when all eight
-cards are free. The current distributed trainer uses replicated model weights
-with gradient all-reduce, not ZeRO/FSDP sharding.
+cards are free. With `DEEPSPEED_CONFIG=./configs/deepspeed_zero2.json`, Phase 2
+uses ZeRO-2 for optimizer states and gradients; the frozen Qwen weights remain
+replicated on each GPU.
 
 ## Current Scope
 

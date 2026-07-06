@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 from pathlib import Path
 
@@ -18,6 +19,34 @@ from geowire.training.distributed import average_gradients, barrier, broadcast_p
 from geowire.training.pretrain_tip import tip_loss_step
 from geowire.utils.io import write_json, write_jsonl
 from geowire.utils.reproducibility import seed_everything
+
+
+def load_deepspeed_config(
+    path: Path,
+    *,
+    world_size: int,
+    micro_batch_size: int,
+    gradient_accumulation_steps: int,
+) -> dict[str, object]:
+    with path.open("r", encoding="utf-8") as handle:
+        config = json.load(handle)
+
+    def replace_auto(value: object, resolved: int) -> object:
+        return resolved if value == "auto" else value
+
+    config["train_micro_batch_size_per_gpu"] = replace_auto(
+        config.get("train_micro_batch_size_per_gpu", "auto"),
+        micro_batch_size,
+    )
+    config["gradient_accumulation_steps"] = replace_auto(
+        config.get("gradient_accumulation_steps", "auto"),
+        gradient_accumulation_steps,
+    )
+    config["train_batch_size"] = replace_auto(
+        config.get("train_batch_size", "auto"),
+        micro_batch_size * gradient_accumulation_steps * max(1, world_size),
+    )
+    return config
 
 
 def load_base_qwen(checkpoint: str, *, device: torch.device, dtype: torch.dtype):
@@ -106,15 +135,39 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
     geowire = GeoWireTransport(hidden_size=hidden_size, num_blocks=args.blocks).to(device)
     load_phase1_adapter(geowire, args.phase1_checkpoint)
     bridge = Qwen3VLGeoWireForConditionalGeneration(base_model, geowire, token_layout_builder=None).to(device)
-    broadcast_parameters(bridge, dist, only_trainable=True)
     bridge.train()
-    opt = torch.optim.AdamW([p for p in bridge.parameters() if p.requires_grad], lr=args.lr, weight_decay=args.weight_decay)
+    trainable_parameters = [p for p in bridge.parameters() if p.requires_grad]
+    use_deepspeed = args.deepspeed_config is not None
+    engine = None
+    opt = None
+    if use_deepspeed:
+        import deepspeed
+
+        ds_config = load_deepspeed_config(
+            args.deepspeed_config,
+            world_size=dist.world_size,
+            micro_batch_size=args.train_micro_batch_size_per_gpu,
+            gradient_accumulation_steps=args.gradient_accumulation_steps,
+        )
+        opt = torch.optim.AdamW(trainable_parameters, lr=args.lr, weight_decay=args.weight_decay)
+        engine, opt, _, _ = deepspeed.initialize(
+            model=bridge,
+            model_parameters=trainable_parameters,
+            optimizer=opt,
+            config=ds_config,
+        )
+        train_model = engine
+    else:
+        broadcast_parameters(bridge, dist, only_trainable=True)
+        opt = torch.optim.AdamW(trainable_parameters, lr=args.lr, weight_decay=args.weight_decay)
+        train_model = bridge
 
     rows: list[dict[str, object]] = []
     qa_to_tip = max(1, args.qa_to_tip)
     for step in range(args.steps):
         use_tip = bool(tip_records) and ((step + 1) % (qa_to_tip + 1) == 0)
-        opt.zero_grad(set_to_none=True)
+        if not use_deepspeed:
+            opt.zero_grad(set_to_none=True)
         if use_tip:
             record = tip_records[((step // (qa_to_tip + 1)) * dist.world_size + dist.rank) % len(tip_records)]
             clip_dir = args.cache_root / record.clip_id
@@ -122,7 +175,7 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
             layout = load_token_layout(clip_dir / "token_layout.safetensors")
             graph = graph_to_device(load_graph_npz(clip_dir / "graph_coo.npz"), device)
             loss, metrics = tip_loss_step(
-                geowire,
+                train_model.module.geowire if use_deepspeed else geowire,
                 clean,
                 graph,
                 layout.frame_index.to(device),
@@ -143,7 +196,7 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
             record = qa_dataset[(step * dist.world_size + dist.rank) % len(qa_dataset)]
             inputs = build_qa_inputs(processor, record, device=device)
             graph = graph_to_device(load_graph_npz(args.cache_root / record.clip_id / "graph_coo.npz"), device)
-            outputs = bridge(graph=graph, **inputs)
+            outputs = train_model(graph=graph, **inputs)
             loss = outputs.loss
             row = {
                 "step": step + 1,
@@ -153,9 +206,13 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
                 "clip_id": record.clip_id,
                 "loss": float(loss.detach()),
             }
-        loss.backward()
-        average_gradients(bridge, dist)
-        opt.step()
+        if use_deepspeed:
+            train_model.backward(loss)
+            train_model.step()
+        else:
+            loss.backward()
+            average_gradients(bridge, dist)
+            opt.step()
         if dist.is_main:
             rows.append(row)
         if dist.is_main and ((step + 1) % args.log_every == 0 or step == args.steps - 1):
@@ -163,12 +220,15 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
 
     barrier(dist)
     if dist.is_main:
+        save_model = train_model.module if use_deepspeed else bridge
         args.output.mkdir(parents=True, exist_ok=True)
         save_torch_state(
             args.output / "phase2_adapters.pt",
             {
-                "geowire": geowire.state_dict(),
-                "qwen_trainable": {k: v.detach().cpu() for k, v in bridge.base_model.state_dict().items() if "lora_" in k},
+                "geowire": save_model.geowire.state_dict(),
+                "qwen_trainable": {
+                    k: v.detach().cpu() for k, v in save_model.base_model.state_dict().items() if "lora_" in k
+                },
             },
         )
         write_jsonl(args.output / "metrics.jsonl", rows)
@@ -181,6 +241,7 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
         write_json(args.output / "metrics.json", final)
         trainer_state = {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()}
         trainer_state["world_size"] = dist.world_size
+        trainer_state["deepspeed_enabled"] = use_deepspeed
         write_json(args.output / "trainer_state.json", trainer_state)
     else:
         final = {"steps": args.steps, "rank": dist.rank, "world_size": dist.world_size}
@@ -200,6 +261,9 @@ def main() -> None:
     parser.add_argument("--log-every", type=int, default=1)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--dtype", choices=["float16", "bfloat16", "float32"], default="bfloat16")
+    parser.add_argument("--deepspeed-config", type=Path)
+    parser.add_argument("--train-micro-batch-size-per-gpu", type=int, default=1)
+    parser.add_argument("--gradient-accumulation-steps", type=int, default=1)
     parser.add_argument("--seed", type=int, default=3407)
     parser.add_argument("--blocks", type=int, default=2)
     parser.add_argument("--lr", type=float, default=2.0e-5)

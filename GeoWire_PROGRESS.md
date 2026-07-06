@@ -189,6 +189,11 @@ The training entrypoints now support `torch.distributed.run` through
 full model replica on each GPU and averages gradients with `all_reduce`; it does
 not use ZeRO/FSDP sharding.
 
+DeepSpeed is installed in the shared conda environment (`deepspeed==0.18.7` on
+both node214 and node218). Phase 2 can enable ZeRO-2 by setting
+`DEEPSPEED_CONFIG=./configs/deepspeed_zero2.json`; this partitions optimizer
+states/gradients but still keeps frozen Qwen weights replicated on each GPU.
+
 Local distributed Phase 1 CPU smoke:
 
 ```text
@@ -238,6 +243,7 @@ passed:
 cd /mnt/guojh/lq/new/GeoWire/geowire
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 \
 NPROC_PER_NODE=6 \
+DEEPSPEED_CONFIG=./configs/deepspeed_zero2.json \
 QA_MANIFEST=/path/to/phase2_qa_manifest.jsonl \
 TIP_MANIFEST=/path/to/phase2_tip_manifest.jsonl \
 CACHE_ROOT=/mnt/guojh/lq/new/cache/geowire/phase2 \
