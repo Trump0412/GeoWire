@@ -370,7 +370,7 @@ Core-Clean mixture
 ## 3.5 Phase 2 任务
 
 1. **Spatial QA generation**：标准自回归回答，覆盖跨视图对应、物体关系、相机关系、视角变化、遮挡、时间变化、多步关系。
-2. **Interleaved TIP retention**：每 3 个 QA batch 后插入 1 个 Phase 1 TIP batch，防止 SFT 将 GeoWire 退化为普通 residual adapter。
+2. **Interleaved TIP retention**：每 15 个 QA batch 后插入 1 个 Phase 1 TIP batch，防止 SFT 将 GeoWire 退化为普通 residual adapter，同时降低 TIP 对 QA SFT 主目标的干扰。
 3. **Static view-order augmentation（仅静态任务）**：对 SPAR/XVR 中不依赖时间方向的问题重排输入图像，答案不变；这是数据增强与评测检查，不构成新的损失模块。
 
 ## 3.6 Phase 2 损失
@@ -404,13 +404,13 @@ TIP batch：
 }
 \]
 
-实现上采用 `3 QA : 1 TIP` batch schedule；不要将被掩码的 TIP 视觉输入与 QA label 强行混在同一个样本中。
+实现上采用 `15 QA : 1 TIP` batch schedule；不要将被掩码的 TIP 视觉输入与 QA label 强行混在同一个样本中。
 
 初始参数：
 
 ```yaml
 phase2:
-  qa_to_tip_batch_ratio: 3:1
+  qa_to_tip_batch_ratio: 15:1
   lambda_tip_effective: 0.20
   lr_geowire: 1.0e-4
   lr_lora: 2.0e-5

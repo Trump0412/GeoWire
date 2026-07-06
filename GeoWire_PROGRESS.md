@@ -29,7 +29,7 @@ Last updated: 2026-07-06
 - Real Phase 0 cache generation is implemented for Qwen3-VL semantic tokens plus VGGT geometry/tracks.
 - Real graph building can use track and projective VGGT candidates with configurable precision/coverage thresholds.
 - Qwen3-VL bridge is implemented as an image-feature-path wrapper and has a real alpha-zero parity script.
-- Phase 2 SFT entrypoint can train Qwen LoRA + GeoWire with a `3 QA : 1 TIP` schedule.
+- Phase 2 SFT entrypoint can train Qwen LoRA + GeoWire with a `15 QA : 1 TIP` schedule.
 - `scripts/launch_phase2_sft_tmux.sh` starts Phase 2 after real cache and parity readiness checks.
 - `scripts/evaluate.py` scores prediction JSONL files against eval configs and writes accuracy reports.
 
@@ -277,6 +277,7 @@ cd /mnt/guojh/lq/new/GeoWire/geowire
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 \
 NPROC_PER_NODE=6 \
 DEEPSPEED_CONFIG=./configs/deepspeed_zero2.json \
+QA_TO_TIP=15 \
 QA_MANIFEST=/path/to/phase2_qa_manifest.jsonl \
 TIP_MANIFEST=/path/to/phase2_tip_manifest.jsonl \
 CACHE_ROOT=/mnt/guojh/lq/new/cache/geowire/phase2 \

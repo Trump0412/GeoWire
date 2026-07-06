@@ -76,6 +76,7 @@ cd /mnt/guojh/lq/new/GeoWire/geowire
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 \
 NPROC_PER_NODE=6 \
 DEEPSPEED_CONFIG=./configs/deepspeed_zero2.json \
+QA_TO_TIP=15 \
 QA_MANIFEST=/path/to/phase2_qa_manifest.jsonl \
 TIP_MANIFEST=/path/to/phase2_tip_manifest.jsonl \
 CACHE_ROOT=/mnt/guojh/lq/new/cache/geowire/phase2 \
@@ -109,7 +110,7 @@ Implemented now:
 - real VGGT geometry/tracks cache generation;
 - real graph construction from track and projective candidates;
 - Qwen3-VL image-feature-path bridge with alpha-zero logits parity;
-- Phase 2 SFT entrypoint for Qwen LoRA + GeoWire with `3 QA : 1 TIP`;
+- Phase 2 SFT entrypoint for Qwen LoRA + GeoWire with `15 QA : 1 TIP`;
 - single-node torchrun support for Phase 1 and Phase 2.
 
 Not yet claimed:

@@ -32,4 +32,4 @@
 - Phase 1 optimizes `L_rec + lambda_sub L_sub + optional lambda_keep L_keep`.
 - Non-edge isolation is diagnostic only and is not included in the default training loss.
 - Support substitution is only valid under masked target tokens.
-- Phase 2 uses `3 QA batches : 1 TIP batch` and remains gated behind Qwen bridge parity.
+- Phase 2 uses `15 QA batches : 1 TIP batch` and remains gated behind Qwen bridge parity.

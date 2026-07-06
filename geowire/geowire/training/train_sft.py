@@ -270,7 +270,7 @@ def main() -> None:
     parser.add_argument("--blocks", type=int, default=2)
     parser.add_argument("--lr", type=float, default=2.0e-5)
     parser.add_argument("--weight-decay", type=float, default=0.0)
-    parser.add_argument("--qa-to-tip", type=int, default=3)
+    parser.add_argument("--qa-to-tip", type=int, default=15)
     parser.add_argument("--lambda-tip-effective", type=float, default=0.20)
     parser.add_argument("--mask-ratio", type=float, default=0.15)
     parser.add_argument("--lambda-sub", type=float, default=0.25)

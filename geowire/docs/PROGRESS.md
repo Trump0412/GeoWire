@@ -66,7 +66,7 @@ is still gated below.
 - Real VGGT geometry/track cache generation from pinned `third_party/vggt`.
 - Real track/projective graph construction with configurable thresholds.
 - Qwen3-VL image-feature bridge with alpha-zero parity script.
-- Phase 2 SFT trainer with Qwen LoRA + GeoWire and `3 QA : 1 TIP` schedule.
+- Phase 2 SFT trainer with Qwen LoRA + GeoWire and `15 QA : 1 TIP` schedule.
 - Phase 2 tmux launcher with real cache and parity readiness gate.
 
 ## Latest Real Server Gates

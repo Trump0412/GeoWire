@@ -7,7 +7,7 @@
 > **主模型**：`Qwen3-VL-4B-Instruct` + frozen `VGGT-1B`  
 > **第一阶段目标**：先证明 **正确几何图能够恢复与隔离语义 token**；在此以前不得启动大规模 spatial QA SFT。
 
-> **v0.2 training override**：`GeoWire_Training_Protocol.md` 覆盖本文件旧版 TIP 内容。Codex 必须执行：Phase 1 仅优化 `L_rec + λ_sub L_sub (+ optional low-weight L_keep)`；`Non-edge isolation` 仅作为诊断，不得作为训练 loss；support substitution 必须在 masked target 上执行；Phase 2 按 `3 QA batches : 1 TIP batch` 交替训练。
+> **v0.2 training override**：`GeoWire_Training_Protocol.md` 覆盖本文件旧版 TIP 内容。Codex 必须执行：Phase 1 仅优化 `L_rec + λ_sub L_sub (+ optional low-weight L_keep)`；`Non-edge isolation` 仅作为诊断，不得作为训练 loss；support substitution 必须在 masked target 上执行；Phase 2 按 `15 QA batches : 1 TIP batch` 交替训练。
 
 
 ---
