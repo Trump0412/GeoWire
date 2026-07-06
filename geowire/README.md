@@ -24,6 +24,13 @@ The current shared machine layout is expected to be:
 /mnt/guojh/lq/new/datasets/benchmarks
 ```
 
+Node218 (`10.99.8.18`) uses the same shared root via:
+
+```text
+10.99.3.13:/NAS/CAPFS/data/guojh -> /mnt/guojh
+runtime user: leiqi
+```
+
 ## Quick Start
 
 ```bash
@@ -58,6 +65,28 @@ python scripts/download_resources.py model Qwen/Qwen3-VL-4B-Instruct \
   --local-dir /mnt/guojh/lq/new/weights/base_models/Qwen3-VL-4B-Instruct
 ```
 
+## Distributed Launch
+
+The Phase 1 and Phase 2 launch scripts support single-node torchrun via
+`NPROC_PER_NODE`. For the current node218 allocation, GPUs 0-5 are the safe
+default while GPUs 6-7 are occupied by another job:
+
+```bash
+cd /mnt/guojh/lq/new/GeoWire/geowire
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 \
+NPROC_PER_NODE=6 \
+QA_MANIFEST=/path/to/phase2_qa_manifest.jsonl \
+TIP_MANIFEST=/path/to/phase2_tip_manifest.jsonl \
+CACHE_ROOT=/mnt/guojh/lq/new/cache/geowire/phase2 \
+PHASE1_CHECKPOINT=/path/to/geowire_adapter.pt \
+PARITY_REPORT=/path/to/passing_parity_report.json \
+./scripts/launch_phase2_sft_tmux.sh
+```
+
+Use `CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 NPROC_PER_NODE=8` when all eight
+cards are free. The current distributed trainer uses replicated model weights
+with gradient all-reduce, not ZeRO/FSDP sharding.
+
 ## Current Scope
 
 Implemented now:
@@ -74,13 +103,17 @@ Implemented now:
 - prediction JSONL evaluator for benchmark reports;
 - leakage audit;
 - Qwen/VGGT inspection and resource download entrypoints.
+- real Qwen3-VL semantic-token cache generation;
+- real VGGT geometry/tracks cache generation;
+- real graph construction from track and projective candidates;
+- Qwen3-VL image-feature-path bridge with alpha-zero logits parity;
+- Phase 2 SFT entrypoint for Qwen LoRA + GeoWire with `3 QA : 1 TIP`;
+- single-node torchrun support for Phase 1 and Phase 2.
 
 Not yet claimed:
 
-- real VGGT cache generation;
-- Qwen3-VL logits parity;
 - Phase 1 full TIP training;
 - Phase 2 spatial SFT.
 
-Those are intentionally gated behind environment/resource inspection and parity
-tests.
+Those are intentionally gated behind full real manifests, graph calibration,
+leakage audit, and benchmark prediction runs.

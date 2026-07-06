@@ -172,6 +172,47 @@ final mode: tip
 phase2_adapters.pt written
 ```
 
+## Node218 Distributed Gate
+
+Node218 (`10.99.8.18`) is connected to the shared project/data root:
+
+```text
+10.99.3.13:/NAS/CAPFS/data/guojh -> /mnt/guojh
+project: /mnt/guojh/lq/new/GeoWire
+python: /mnt/guojh/lq/new/conda/envs/geothinker/bin/python
+runtime user: leiqi, UID/GID 1012
+gpu: 8 x A100 80GB visible
+```
+
+The training entrypoints now support `torch.distributed.run` through
+`NPROC_PER_NODE` in the tmux launch scripts. The current implementation keeps a
+full model replica on each GPU and averages gradients with `all_reduce`; it does
+not use ZeRO/FSDP sharding.
+
+Local distributed Phase 1 CPU smoke:
+
+```text
+output: runs/ddp_tip_cpu_smoke
+processes: 2
+result: checkpoint and metrics written by rank 0
+```
+
+Node218 Phase 2 distributed smoke:
+
+```text
+2 GPU output: runs/node218_phase2_sft_torchrun2_smoke_new
+8 GPU output: runs/node218_phase2_sft_torchrun8_smoke
+world_size: 8
+final step: 4
+final mode: tip
+final loss: 0.5104734301567078
+adapter: runs/node218_phase2_sft_torchrun8_smoke/phase2_adapters.pt
+```
+
+Current resource note: GPUs 0-5 were free after the smoke, while GPUs 6-7 were
+occupied by an unrelated job. Use six cards now, or switch to all eight when 6-7
+are released.
+
 ## Phase 1 Launch Template
 
 After real cached clips have `token_layout.safetensors`, `semantic_tokens.safetensors`,
@@ -179,11 +220,38 @@ After real cached clips have `token_layout.safetensors`, `semantic_tokens.safete
 
 ```bash
 cd /mnt/guojh/lq/new/GeoWire/geowire
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 \
+NPROC_PER_NODE=6 \
 MANIFEST=/path/to/train_manifest.jsonl \
 CACHE_ROOT=/mnt/guojh/lq/new/cache/geowire/phase1 \
 STEPS=30000 \
 SESSION=geowire_phase1_tip \
 ./scripts/launch_phase1_tip_tmux.sh
+```
+
+## Phase 2 Launch Template
+
+After Phase 1 has produced `geowire_adapter.pt` and Qwen alpha-zero parity has
+passed:
+
+```bash
+cd /mnt/guojh/lq/new/GeoWire/geowire
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 \
+NPROC_PER_NODE=6 \
+QA_MANIFEST=/path/to/phase2_qa_manifest.jsonl \
+TIP_MANIFEST=/path/to/phase2_tip_manifest.jsonl \
+CACHE_ROOT=/mnt/guojh/lq/new/cache/geowire/phase2 \
+PHASE1_CHECKPOINT=/path/to/geowire_adapter.pt \
+PARITY_REPORT=/path/to/passing_parity_report.json \
+STEPS=12000 \
+SESSION=geowire_phase2_sft \
+./scripts/launch_phase2_sft_tmux.sh
+```
+
+When GPUs 6-7 are free, switch to:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 NPROC_PER_NODE=8
 ```
 
 ## Evaluation Entry

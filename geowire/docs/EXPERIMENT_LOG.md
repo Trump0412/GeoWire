@@ -100,3 +100,24 @@ schedule: QA, QA, QA, TIP
 final_loss: 0.5104734301567078
 adapter: runs/phase2_sft_smoke_real_backend_4step/phase2_adapters.pt
 ```
+
+Node218 shared mount and distributed smoke:
+
+```text
+date: 2026-07-06
+host: 10.99.8.18
+mount: 10.99.3.13:/NAS/CAPFS/data/guojh -> /mnt/guojh
+project: /mnt/guojh/lq/new/GeoWire/geowire
+runtime user: leiqi, UID/GID 1012
+python: /mnt/guojh/lq/new/conda/envs/geothinker/bin/python
+gpu: 8 x A100 80GB visible
+distributed support: torch.distributed.run with rank-0 checkpoint/log writes
+phase1 ddp smoke: runs/ddp_tip_cpu_smoke, 2 CPU processes
+phase2 2-gpu smoke: runs/node218_phase2_sft_torchrun2_smoke_new
+phase2 8-gpu smoke: runs/node218_phase2_sft_torchrun8_smoke
+phase2 8-gpu world_size: 8
+phase2 8-gpu final step: 4
+phase2 8-gpu final mode: tip
+phase2 8-gpu final_loss: 0.5104734301567078
+note: GPUs 6-7 were occupied by an unrelated job after the smoke; use GPUs 0-5 until they are free
+```
