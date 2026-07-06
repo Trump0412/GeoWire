@@ -137,3 +137,32 @@ final_mode: tip
 final_loss: 0.5078125
 adapter: runs/node218_phase2_sft_zero2_torchrun2_smoke/phase2_adapters.pt
 ```
+
+LLaVA-Hound real-data smoke:
+
+```text
+date: 2026-07-07
+host: 10.99.8.18
+source_json: /mnt/guojh/lq/new/local_mirror/myproject/spatial4nips/data/train/llava_hound_64k.json
+full_manifest: /mnt/guojh/lq/new/datasets/manifests/llava_hound.jsonl
+full_manifest_records: 63750
+sampled_file_audit: 128 / 128 records present
+smoke_manifest: /mnt/guojh/lq/new/datasets/manifests/llava_hound_smoke8.jsonl
+smoke_cache: /mnt/guojh/lq/new/cache/geowire/llava_hound_smoke8
+smoke_real_cache_records: 8
+smoke_graph_records: 8
+phase1_readiness: runs/llava_smoke8_graph/phase1_readiness.json, passed
+phase1_command: torch.distributed.run --standalone --nproc_per_node=2 scripts/train_tip.py --steps 20
+phase1_output: runs/llava_hound_smoke8_phase1_tip_20step
+phase1_final_loss: 0.3427661061286926
+phase1_full_rec: 0.345902681350708
+phase1_self_loop_rec: 0.736224889755249
+phase1_random_graph_rec: 0.5384038686752319
+phase1_shuffled_graph_rec: 0.5328946113586426
+qwen_parity: runs/qwen_bridge_parity/llava_hound_smoke8_report.json, max_abs_logit_diff=0.0
+phase2_readiness: runs/llava_smoke8_graph/phase2_readiness.json, passed
+phase2_command: torch.distributed.run --standalone --nproc_per_node=2 scripts/train_sft.py --steps 4 --deepspeed-config configs/deepspeed_zero2.json
+phase2_output: runs/llava_hound_smoke8_phase2_sft_zero2_4step
+phase2_final_mode: tip
+phase2_final_loss: 0.5
+```

@@ -227,6 +227,26 @@ final loss: 0.5078125
 adapter: runs/node218_phase2_sft_zero2_torchrun2_smoke/phase2_adapters.pt
 ```
 
+LLaVA-Hound real-data smoke:
+
+```text
+source json: /mnt/guojh/lq/new/local_mirror/myproject/spatial4nips/data/train/llava_hound_64k.json
+full manifest: /mnt/guojh/lq/new/datasets/manifests/llava_hound.jsonl
+full manifest records: 63750
+full manifest sampled file audit: 128 / 128 records present
+smoke manifest: /mnt/guojh/lq/new/datasets/manifests/llava_hound_smoke8.jsonl
+smoke cache: /mnt/guojh/lq/new/cache/geowire/llava_hound_smoke8
+smoke cache records: 8 real Qwen/VGGT caches, 8 graphs
+phase1 readiness: runs/llava_smoke8_graph/phase1_readiness.json, passed
+phase2 readiness: runs/llava_smoke8_graph/phase2_readiness.json, passed
+qwen parity: runs/qwen_bridge_parity/llava_hound_smoke8_report.json, max_abs_logit_diff=0.0
+phase1 smoke: runs/llava_hound_smoke8_phase1_tip_20step, world_size=2, final step=20
+phase1 final loss: 0.3427661061286926
+phase1 graph controls: self=0.736224889755249, random=0.5384038686752319, shuffled=0.5328946113586426, full=0.345902681350708
+phase2 ZeRO-2 smoke: runs/llava_hound_smoke8_phase2_sft_zero2_4step, world_size=2, final step=4
+phase2 final mode/loss: tip / 0.5
+```
+
 Current resource note: GPUs 0-5 were free after the smoke, while GPUs 6-7 were
 occupied by an unrelated job. Use six cards now, or switch to all eight when 6-7
 are released.
