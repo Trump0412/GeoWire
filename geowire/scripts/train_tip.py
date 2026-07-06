@@ -54,7 +54,10 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
     for step in range(args.steps):
         record = records[(step * dist.world_size + dist.rank) % len(records)]
         clip_dir = args.cache_root / record.clip_id
-        clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(device)
+        clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(
+            device=device,
+            dtype=next(model.parameters()).dtype,
+        )
         layout = load_token_layout(clip_dir / "token_layout.safetensors")
         graph = graph_to_device(load_graph_npz(clip_dir / "graph_coo.npz"), device)
         frame_index = layout.frame_index.to(device)
