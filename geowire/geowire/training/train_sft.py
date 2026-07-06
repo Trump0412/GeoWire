@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import torch
@@ -13,6 +14,7 @@ from geowire.models.geowire import GeoWireTransport
 from geowire.models.qwen3vl_bridge import Qwen3VLGeoWireForConditionalGeneration, graph_to_device
 from geowire.models.qwen3vl_cache import ordered_image_messages
 from geowire.training.checkpoints import load_torch_state, save_torch_state
+from geowire.training.distributed import average_gradients, barrier, broadcast_parameters, cleanup, init_distributed
 from geowire.training.pretrain_tip import tip_loss_step
 from geowire.utils.io import write_json, write_jsonl
 from geowire.utils.reproducibility import seed_everything
@@ -85,7 +87,8 @@ def load_phase1_adapter(geowire: GeoWireTransport, checkpoint: Path | None) -> N
 
 def run_phase2(args: argparse.Namespace) -> dict[str, object]:
     seed_everything(args.seed)
-    device = torch.device(args.device)
+    dist = init_distributed(args.device)
+    device = dist.device
     dtype = getattr(torch, args.dtype)
     qa_dataset = SpatialSFTDataset.from_manifest(args.qa_manifest)
     tip_records = load_manifest(args.tip_manifest) if args.tip_manifest else []
@@ -103,6 +106,7 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
     geowire = GeoWireTransport(hidden_size=hidden_size, num_blocks=args.blocks).to(device)
     load_phase1_adapter(geowire, args.phase1_checkpoint)
     bridge = Qwen3VLGeoWireForConditionalGeneration(base_model, geowire, token_layout_builder=None).to(device)
+    broadcast_parameters(bridge, dist, only_trainable=True)
     bridge.train()
     opt = torch.optim.AdamW([p for p in bridge.parameters() if p.requires_grad], lr=args.lr, weight_decay=args.weight_decay)
 
@@ -112,7 +116,7 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
         use_tip = bool(tip_records) and ((step + 1) % (qa_to_tip + 1) == 0)
         opt.zero_grad(set_to_none=True)
         if use_tip:
-            record = tip_records[(step // (qa_to_tip + 1)) % len(tip_records)]
+            record = tip_records[((step // (qa_to_tip + 1)) * dist.world_size + dist.rank) % len(tip_records)]
             clip_dir = args.cache_root / record.clip_id
             clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(device)
             layout = load_token_layout(clip_dir / "token_layout.safetensors")
@@ -127,32 +131,60 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
                 lambda_keep=args.lambda_keep,
             )
             loss = loss * args.lambda_tip_effective
-            row = {"step": step + 1, "mode": "tip", "clip_id": record.clip_id, **metrics}
+            row = {
+                "step": step + 1,
+                "rank": dist.rank,
+                "world_size": dist.world_size,
+                "mode": "tip",
+                "clip_id": record.clip_id,
+                **metrics,
+            }
         else:
-            record = qa_dataset[step % len(qa_dataset)]
+            record = qa_dataset[(step * dist.world_size + dist.rank) % len(qa_dataset)]
             inputs = build_qa_inputs(processor, record, device=device)
             graph = graph_to_device(load_graph_npz(args.cache_root / record.clip_id / "graph_coo.npz"), device)
             outputs = bridge(graph=graph, **inputs)
             loss = outputs.loss
-            row = {"step": step + 1, "mode": "qa", "clip_id": record.clip_id, "loss": float(loss.detach())}
+            row = {
+                "step": step + 1,
+                "rank": dist.rank,
+                "world_size": dist.world_size,
+                "mode": "qa",
+                "clip_id": record.clip_id,
+                "loss": float(loss.detach()),
+            }
         loss.backward()
+        average_gradients(bridge, dist)
         opt.step()
-        rows.append(row)
-        if (step + 1) % args.log_every == 0 or step == args.steps - 1:
+        if dist.is_main:
+            rows.append(row)
+        if dist.is_main and ((step + 1) % args.log_every == 0 or step == args.steps - 1):
             print(row)
 
-    args.output.mkdir(parents=True, exist_ok=True)
-    save_torch_state(
-        args.output / "phase2_adapters.pt",
-        {
-            "geowire": geowire.state_dict(),
-            "qwen_trainable": {k: v.detach().cpu() for k, v in bridge.base_model.state_dict().items() if "lora_" in k},
-        },
-    )
-    write_jsonl(args.output / "metrics.jsonl", rows)
-    final = {"steps": args.steps, "output": str(args.output), "final": rows[-1] if rows else {}}
-    write_json(args.output / "metrics.json", final)
-    write_json(args.output / "trainer_state.json", {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()})
+    barrier(dist)
+    if dist.is_main:
+        args.output.mkdir(parents=True, exist_ok=True)
+        save_torch_state(
+            args.output / "phase2_adapters.pt",
+            {
+                "geowire": geowire.state_dict(),
+                "qwen_trainable": {k: v.detach().cpu() for k, v in bridge.base_model.state_dict().items() if "lora_" in k},
+            },
+        )
+        write_jsonl(args.output / "metrics.jsonl", rows)
+        final = {
+            "steps": args.steps,
+            "output": str(args.output),
+            "world_size": dist.world_size,
+            "final": rows[-1] if rows else {},
+        }
+        write_json(args.output / "metrics.json", final)
+        trainer_state = {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()}
+        trainer_state["world_size"] = dist.world_size
+        write_json(args.output / "trainer_state.json", trainer_state)
+    else:
+        final = {"steps": args.steps, "rank": dist.rank, "world_size": dist.world_size}
+    cleanup(dist)
     return final
 
 
@@ -187,4 +219,6 @@ def main() -> None:
         default=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
     )
     args = parser.parse_args()
-    print(run_phase2(args))
+    result = run_phase2(args)
+    if int(os.environ.get("RANK", "0")) == 0:
+        print(result)
