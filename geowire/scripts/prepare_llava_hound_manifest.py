@@ -61,6 +61,7 @@ def build_manifest_rows(
     *,
     media_root: Path,
     max_frames: int,
+    trust_frame_count: int,
     limit: int | None,
     offset: int,
     split: str,
@@ -70,6 +71,7 @@ def build_manifest_rows(
         "input_items": len(items),
         "offset": offset,
         "limit": limit,
+        "trust_frame_count": trust_frame_count,
         "kept": 0,
         "skipped_missing_frames": 0,
         "skipped_missing_qa": 0,
@@ -85,7 +87,11 @@ def build_manifest_rows(
         if not video_rel:
             stats["skipped_missing_frames"] += 1
             continue
-        frames = frame_files(media_root / video_rel)
+        video_dir = media_root / video_rel
+        if trust_frame_count > 0:
+            frames = [video_dir / f"frame_{index + 1:02d}.jpg" for index in range(trust_frame_count)]
+        else:
+            frames = frame_files(video_dir)
         if len(frames) < 2:
             stats["skipped_missing_frames"] += 1
             continue
@@ -118,6 +124,12 @@ def main() -> None:
     parser.add_argument("--media-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-frames", type=int, default=8)
+    parser.add_argument(
+        "--trust-frame-count",
+        type=int,
+        default=0,
+        help="Fast path for already-extracted frame dirs named frame_01.jpg...frame_NN.jpg; skips directory listing.",
+    )
     parser.add_argument("--limit", type=int)
     parser.add_argument("--offset", type=int, default=0)
     parser.add_argument("--split", choices=["train", "val", "test"], default="train")
@@ -132,6 +144,7 @@ def main() -> None:
         items,
         media_root=args.media_root,
         max_frames=args.max_frames,
+        trust_frame_count=args.trust_frame_count,
         limit=args.limit,
         offset=args.offset,
         split=args.split,
