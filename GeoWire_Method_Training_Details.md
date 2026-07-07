@@ -25,20 +25,20 @@ Observed pilot:
 | Phase 2 schedule | 15 QA : 1 TIP |
 
 This is too small. The formal training target is to run near 65-75 GB/GPU on
-A100-80G while preserving stable loss and throughput. The next engineering gate
-is true per-device micro-batching / sample packing plus length bucketing.
-Gradient accumulation alone does not raise activation memory; it only changes
-the effective update batch size.
+A100-80G while preserving stable loss and throughput.
 
-Current implementation limitation:
+Status after the latest engineering pass:
 
-- Phase 1 and Phase 2 currently process one record per rank per microstep.
-- `train_micro_batch_size_per_gpu` is passed into the DeepSpeed config, but the
-  Python training loop still fetches one QA or TIP sample per GPU per step.
-- Therefore setting the DeepSpeed micro-batch value higher does not by itself
-  fill GPU memory or improve sample throughput.
+- true per-device QA batching is implemented in Phase 2 SFT;
+- true TIP microbatch packing is implemented in Phase 1 and Phase 2;
+- checkpoint save intervals are implemented for formal Phase 2;
+- the formal Qwen-free data manifests have been generated and audited;
+- the 4B model path is kept only as a validated pilot path;
+- the formal launch should switch to `Qwen3-VL-2B-Instruct` before the next
+  cache/ramp/training pass.
 
-Formal run is blocked until a 512- or 1024-sample 8-card tuning pilot shows:
+Formal run is still gated until a 512- or 1024-sample 8-card tuning pilot with
+the 2B model shows:
 
 - sustained memory target: 65-75 GB/GPU;
 - no OOM for the selected frame count and max text length;
@@ -90,12 +90,51 @@ Training data to include:
 | Source | Available records | Use in GeoWire | Role |
 |---|---:|---|---|
 | LLaVA-Hound | 63,750 | Phase 1/2 | natural video semantics and temporal-spatial QA |
-| SPAR / spar_234k | 234,277 | Phase 0/1/2 | multi-view spatial relations and RGB-D style evidence |
+| SPAR / spar_234k | 234,056 | Phase 0/1/2 | multi-view spatial relations and RGB-D style evidence |
 | VSI-590K | 590,667 | Phase 2 | large spatial instruction tuning |
 | VLM3R-VSI | 205,456 | Phase 2 | view-spatial instruction data |
 | VLM3R-VST | 132,568 | Phase 2 | temporal/view-spatial instruction data |
 | JoyAI OpenSpatial | 100,000 | Phase 2 | diverse spatial QA |
 | MindCube | 10,000 | Phase 2 | structured multi-view/mind-cube spatial reasoning |
+
+Formal manifest artifacts:
+
+```text
+root: /mnt/guojh/lq/new/datasets/manifests/geowire_formal_f8
+qa manifest: phase2_all.jsonl
+tip manifest: phase2_tip_multiframe.jsonl
+report: formal_manifest_report.json
+```
+
+Formal manifest counts:
+
+| Manifest | Rows | Unique clips | Notes |
+|---|---:|---:|---|
+| `phase2_all.jsonl` | 1,336,497 | 370,380 | all approved QA records |
+| `phase2_tip_multiframe.jsonl` | 944,716 | 179,810 | single-frame records removed |
+
+`phase2_all.jsonl` source mix:
+
+| Source | Rows |
+|---|---:|
+| LLaVA-Hound | 63,750 |
+| SPAR | 234,056 |
+| VSI-590K | 590,667 |
+| VLM3R-VSI | 205,456 |
+| VLM3R-VST | 132,568 |
+| JoyAI OpenSpatial | 100,000 |
+| MindCube | 10,000 |
+
+`phase2_tip_multiframe.jsonl` source mix:
+
+| Source | Rows |
+|---|---:|
+| LLaVA-Hound | 63,750 |
+| SPAR | 158,794 |
+| VSI-590K | 374,148 |
+| VLM3R-VSI | 205,456 |
+| VLM3R-VST | 132,568 |
+| MindCube | 10,000 |
 
 Data not used for GeoWire training:
 
@@ -261,6 +300,8 @@ Current Phase 2 defaults:
 ```yaml
 qa_to_tip: 15
 tip_feature_mode: online_qwen
+base_model_for_formal_run: Qwen3-VL-2B-Instruct
+base_model_for_pilot_only: Qwen3-VL-4B-Instruct
 deepspeed: configs/deepspeed_zero2.json
 lora_rank: 32
 lora_alpha: 64
@@ -276,6 +317,7 @@ hardware: 8 x A100 80GB
 fine_tuning: LoRA first
 full_parameter_tuning: ablation only after LoRA signal is known
 cache_backend_first_run: qwen_layout_grid
+qwen_model: Qwen3-VL-2B-Instruct
 approved_large_sources:
   - VSI-590K
   - VLM3R-VSI
@@ -377,8 +419,9 @@ ETA can only be trusted after the tuning pilot. A rough planning estimate:
 | Run | Assumption | Rough ETA |
 |---|---|---:|
 | Phase 1 30k steps | true global microbatch 32-48, 16 frames | 1-2 days |
-| Phase 2 one pass over about 1.3M records | global microbatch 32, 4-8 sec/step | about 2-4 days |
-| Phase 2 larger per-GPU batch | global microbatch 48-64 if stable | about 1.5-3 days |
+| Phase 2 one pass over about 1.3M records, 4B pilot path | global microbatch 16, measured smoke average about 3.4 sec/step | about 3.5-4.2 days |
+| Phase 2 one pass, 2B planned path | global microbatch 16, expected lower model cost | about 2.5-3.5 days |
+| Phase 2 larger per-GPU batch on 2B | global microbatch 32-64 if stable | about 1.5-2.8 days |
 
 The formal ETA must be recomputed from measured tuning logs, not from smoke
 logs. The current smoke logs are initialization-heavy and too underbatched.
@@ -433,12 +476,13 @@ launch_command.sh
 ## 10. Immediate TODO Before Formal Training
 
 1. Implement true per-device batching / graph packing in `train_tip.py` and
-   `train_sft.py`. Status: implemented for formal LoRA launch.
+   `train_sft.py`. Status: done.
 2. Build unified manifests for all selected GeoWire datasets, excluding
-   SpatialLadder.
-3. Build compact graph caches for real train clips.
-4. Run a 512- or 1024-sample 8-card memory ramp.
-5. Select the largest stable setting that keeps A100 memory around 65-75 GB.
-6. Launch Phase 1 real TIP.
-7. Launch Phase 2 SFT with `15 QA : 1 TIP`.
-8. Start evaluation jobs from the first real Phase 2 checkpoint.
+   SpatialLadder. Status: done.
+3. Download or sync `Qwen3-VL-2B-Instruct` under the shared weight root.
+4. Build `qwen_layout_grid` cache with the 2B processor/checkpoint path.
+5. Run a 512- or 1024-sample 8-card memory ramp.
+6. Select the largest stable setting that keeps A100 memory around 65-75 GB.
+7. Launch Phase 1 real TIP.
+8. Launch Phase 2 SFT with `15 QA : 1 TIP`.
+9. Start evaluation jobs from the first real Phase 2 checkpoint.

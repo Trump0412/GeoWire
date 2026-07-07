@@ -121,6 +121,8 @@ cached Phase 1 gate, not real paper training.
 ## Server Resource Check
 
 - `Qwen3-VL-4B-Instruct`: present at `/mnt/guojh/lq/new/weights/base_models/Qwen3-VL-4B-Instruct` (`8.3G`).
+- `Qwen3-VL-2B-Instruct`: planned formal model; not yet present in the shared
+  weight root as of the latest check.
 - `VGGT-1B`: present at `/mnt/guojh/lq/new/weights/base_models/VGGT-1B` (`9.4G`).
 - Shared conda env still has `transformers==4.50.0`; GeoWire uses project-local overlay
   `/mnt/guojh/lq/new/GeoWire/.deps/transformers_4_57_6` for Qwen3-VL.
@@ -261,6 +263,57 @@ phase2 launcher default: TIP_FEATURE_MODE=online_qwen
 phase2 readiness with online mode: require_real_cache=false unless explicitly requested
 ```
 
+Formal Qwen-free manifest build:
+
+```text
+date: 2026-07-07
+session: geowire_manifest_build
+status: completed
+builder: scripts/build_formal_manifests.sh
+root: /mnt/guojh/lq/new/datasets/manifests/geowire_formal_f8
+report: /mnt/guojh/lq/new/datasets/manifests/geowire_formal_f8/formal_manifest_report.json
+qa manifest: phase2_all.jsonl
+qa rows: 1,336,497
+qa unique clips: 370,380
+tip manifest: phase2_tip_multiframe.jsonl
+tip rows: 944,716
+tip unique clips: 179,810
+phase2 estimated steps at per-GPU batch 2 on 8 GPUs: 89,104
+qwen dependency: none for this build
+```
+
+Source counts in `phase2_all.jsonl`:
+
+| Source | Rows |
+|---|---:|
+| LLaVA-Hound | 63,750 |
+| SPAR | 234,056 |
+| VSI-590K | 590,667 |
+| VLM3R-VSI | 205,456 |
+| VLM3R-VST | 132,568 |
+| JoyAI OpenSpatial | 100,000 |
+| MindCube | 10,000 |
+
+Source counts in `phase2_tip_multiframe.jsonl`:
+
+| Source | Rows |
+|---|---:|
+| LLaVA-Hound | 63,750 |
+| SPAR | 158,794 |
+| VSI-590K | 374,148 |
+| VLM3R-VSI | 205,456 |
+| VLM3R-VST | 132,568 |
+| MindCube | 10,000 |
+
+Current formal decision:
+
+```text
+Do not launch the next long cache/training pass on Qwen3-VL-4B-Instruct.
+Use the already validated 4B path only as a pilot reference.
+Download/sync Qwen3-VL-2B-Instruct, then rerun the memory ramp and launch the
+formal 8-card run from the 2B path.
+```
+
 Node218 8-GPU online-Qwen pilot:
 
 ```text
@@ -282,9 +335,9 @@ phase2 final mode/loss: tip / 0.47265625
 gpu memory: Phase1 about 10-11 GB/GPU, Phase2 about 17-27 GB/GPU on the smoke clips
 ```
 
-Current resource note: GPUs 0-5 were free after the smoke, while GPUs 6-7 were
-occupied by an unrelated job. Use six cards now, or switch to all eight when 6-7
-are released.
+Current resource note: the formal manifest build does not use GPUs. Check
+`nvidia-smi` immediately before the 2B cache/ramp launch and use all eight cards
+if they remain free.
 
 ## Phase 1 Launch Template
 
@@ -342,7 +395,8 @@ python scripts/evaluate.py \
 
 ## Gated Before Full Real Training
 
-- Full training manifests must be built from the real SPAR/LLaVA-Hound/XVR pools with scene-level leakage audit.
+- `Qwen3-VL-2B-Instruct` must be present under `/mnt/guojh/lq/new/weights/base_models`.
+- 2B `qwen_layout_grid` cache/ramp must pass on the formal manifests.
 - Graph thresholds must be calibrated on real clips with visual overlay audit; the smoke used loose thresholds only to verify the engineering path.
 - Phase 1 should not advance to paper Phase 2 claims until full graph beats self/random/shuffled controls on a real validation subset.
 - Benchmark generation wrappers still need real prediction runs for VSI/MMSI/ViewSpatial; the scorer already exists.
