@@ -12,6 +12,7 @@ venv/
 # Generated run artifacts and local smoke outputs
 runs/
 geowire/runs/
+geowire/logs/
 geowire/assets/toy_scene/
 geowire/assets/*_smoke_scene/
 
