@@ -247,6 +247,39 @@ phase2 ZeRO-2 smoke: runs/llava_hound_smoke8_phase2_sft_zero2_4step, world_size=
 phase2 final mode/loss: tip / 0.5
 ```
 
+Online-Qwen TIP mode:
+
+```text
+commit: 1c1c697
+mode: TIP clean visual tokens are computed online through frozen Qwen visual forward
+large cache avoided: semantic_tokens.safetensors no longer required for formal TIP/SFT training
+required cache: token_layout.safetensors, graph_coo.npz, metadata.json
+phase1 launcher default: TIP_FEATURE_MODE=online_qwen
+phase2 launcher default: TIP_FEATURE_MODE=online_qwen
+phase2 readiness with online mode: require_real_cache=false unless explicitly requested
+```
+
+Node218 8-GPU online-Qwen pilot:
+
+```text
+date: 2026-07-07
+session: geowire_online_qwen_pilot8
+manifest: /mnt/guojh/lq/new/datasets/manifests/llava_hound_smoke8.jsonl
+cache: /mnt/guojh/lq/new/cache/geowire/llava_hound_smoke8
+phase1 output: runs/online_qwen_llava_smoke8_phase1_tip_16step_8gpu
+phase1 world_size: 8
+phase1 steps: 16
+phase1 elapsed: 67 seconds including 8-rank Qwen load
+phase1 final loss: 0.46381279826164246
+phase2 output: runs/online_qwen_llava_smoke8_phase2_sft_zero2_16step_8gpu
+phase2 world_size: 8
+phase2 steps: 16
+phase2 elapsed: 41 seconds including model/ZeRO initialization
+phase2 qa_to_tip: 15
+phase2 final mode/loss: tip / 0.47265625
+gpu memory: Phase1 about 10-11 GB/GPU, Phase2 about 17-27 GB/GPU on the smoke clips
+```
+
 Current resource note: GPUs 0-5 were free after the smoke, while GPUs 6-7 were
 occupied by an unrelated job. Use six cards now, or switch to all eight when 6-7
 are released.

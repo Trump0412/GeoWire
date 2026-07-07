@@ -166,3 +166,26 @@ phase2_output: runs/llava_hound_smoke8_phase2_sft_zero2_4step
 phase2_final_mode: tip
 phase2_final_loss: 0.5
 ```
+
+Online-Qwen TIP pilot:
+
+```text
+date: 2026-07-07
+host: 10.99.8.18
+commit: 1c1c697
+mode: online_qwen
+purpose: avoid random NFS reads of large semantic_tokens.safetensors during TIP
+required_cache_files: token_layout.safetensors, graph_coo.npz, metadata.json
+manifest: /mnt/guojh/lq/new/datasets/manifests/llava_hound_smoke8.jsonl
+cache: /mnt/guojh/lq/new/cache/geowire/llava_hound_smoke8
+phase1_command: torch.distributed.run --standalone --nproc_per_node=8 scripts/train_tip.py --tip-feature-mode online_qwen --steps 16
+phase1_output: runs/online_qwen_llava_smoke8_phase1_tip_16step_8gpu
+phase1_elapsed_seconds: 67
+phase1_final_loss: 0.46381279826164246
+phase2_command: torch.distributed.run --standalone --nproc_per_node=8 scripts/train_sft.py --tip-feature-mode online_qwen --qa-to-tip 15 --deepspeed-config configs/deepspeed_zero2.json --steps 16
+phase2_output: runs/online_qwen_llava_smoke8_phase2_sft_zero2_16step_8gpu
+phase2_elapsed_seconds: 41
+phase2_final_mode: tip
+phase2_final_loss: 0.47265625
+phase2_readiness: require_real_cache=false, tip_feature_mode=online_qwen
+```

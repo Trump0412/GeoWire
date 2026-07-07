@@ -77,6 +77,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 \
 NPROC_PER_NODE=6 \
 DEEPSPEED_CONFIG=./configs/deepspeed_zero2.json \
 QA_TO_TIP=15 \
+TIP_FEATURE_MODE=online_qwen \
 QA_MANIFEST=/path/to/phase2_qa_manifest.jsonl \
 TIP_MANIFEST=/path/to/phase2_tip_manifest.jsonl \
 CACHE_ROOT=/mnt/guojh/lq/new/cache/geowire/phase2 \
@@ -86,8 +87,10 @@ PARITY_REPORT=/path/to/passing_parity_report.json \
 ```
 
 Use `CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 NPROC_PER_NODE=8` when all eight
-cards are free. With `DEEPSPEED_CONFIG=./configs/deepspeed_zero2.json`, Phase 2
-uses ZeRO-2 for optimizer states and gradients; the frozen Qwen weights remain
+cards are free. With `TIP_FEATURE_MODE=online_qwen`, TIP computes frozen Qwen
+visual tokens during training and does not require large semantic-token cache
+files. With `DEEPSPEED_CONFIG=./configs/deepspeed_zero2.json`, Phase 2 uses
+ZeRO-2 for optimizer states and gradients; the frozen Qwen weights remain
 replicated on each GPU.
 
 ## Current Scope
