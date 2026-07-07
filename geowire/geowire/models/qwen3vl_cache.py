@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import Any
 
@@ -23,12 +24,19 @@ class QwenVisualCache:
 
 def ordered_image_messages(record: ClipRecord) -> list[dict[str, Any]]:
     content: list[dict[str, Any]] = []
+    image_max_pixels = os.environ.get("GEOWIRE_IMAGE_MAX_PIXELS")
+    image_min_pixels = os.environ.get("GEOWIRE_IMAGE_MIN_PIXELS")
     for frame_id, frame_path in enumerate(record.frame_paths):
         label = f"Frame {frame_id}"
         if frame_id < len(record.timestamps_s):
             label += f" | timestamp {record.timestamps_s[frame_id]:.2f}s"
         content.append({"type": "text", "text": f"[{label}]"})
-        content.append({"type": "image", "image": frame_path})
+        image_item: dict[str, Any] = {"type": "image", "image": frame_path}
+        if image_max_pixels:
+            image_item["max_pixels"] = int(image_max_pixels)
+        if image_min_pixels:
+            image_item["min_pixels"] = int(image_min_pixels)
+        content.append(image_item)
     question = record.question or "Describe the spatial scene across these frames."
     content.append({"type": "text", "text": f"Question: {question}"})
     return [{"role": "user", "content": content}]

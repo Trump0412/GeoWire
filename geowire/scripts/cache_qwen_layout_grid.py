@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -137,6 +138,8 @@ def cache_record(
             "graph_backend": "same_grid_correspondence",
             "all_pairs": all_pairs,
             "topk_cross_frame": topk_cross_frame,
+            "image_max_pixels": os.environ.get("GEOWIRE_IMAGE_MAX_PIXELS"),
+            "image_min_pixels": os.environ.get("GEOWIRE_IMAGE_MIN_PIXELS"),
             "note": "Compact training cache: exact Qwen token layout plus deterministic same-grid cross-frame graph.",
         },
     )
