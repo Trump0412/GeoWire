@@ -38,6 +38,48 @@ def graph_to_device(graph: SparseGraph, device: torch.device) -> SparseGraph:
     )
 
 
+def pack_graphs(graphs: list[SparseGraph]) -> SparseGraph:
+    if not graphs:
+        raise ValueError("cannot pack an empty graph list")
+    dst_rows: list[torch.Tensor] = []
+    src_rows: list[torch.Tensor] = []
+    weight_rows: list[torch.Tensor] = []
+    edge_type_rows: list[torch.Tensor] = []
+    reproj_rows: list[torch.Tensor] = []
+    cycle_rows: list[torch.Tensor] = []
+    visibility_rows: list[torch.Tensor] = []
+    confidence_rows: list[torch.Tensor] = []
+    offset = 0
+    for graph in graphs:
+        dst_rows.append(graph.dst + offset)
+        src_rows.append(graph.src + offset)
+        weight_rows.append(graph.weight)
+        edge_type_rows.append(graph.edge_type)
+        reproj_rows.append(graph.reproj_error)
+        cycle_rows.append(graph.cycle_error)
+        visibility_rows.append(graph.visibility)
+        confidence_rows.append(graph.confidence)
+        offset += graph.num_nodes
+    return SparseGraph(
+        num_nodes=offset,
+        dst=torch.cat(dst_rows),
+        src=torch.cat(src_rows),
+        weight=torch.cat(weight_rows),
+        edge_type=torch.cat(edge_type_rows),
+        reproj_error=torch.cat(reproj_rows),
+        cycle_error=torch.cat(cycle_rows),
+        visibility=torch.cat(visibility_rows),
+        confidence=torch.cat(confidence_rows),
+    )
+
+
+def select_rank_batch(records, *, step: int, rank: int, world_size: int, batch_size: int) -> list:
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+    start = step * world_size * batch_size + rank * batch_size
+    return [records[(start + local) % len(records)] for local in range(batch_size)]
+
+
 def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str]:
     dist = init_distributed(args.device)
     records = load_manifest(args.manifest)
@@ -72,29 +114,46 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
 
     metrics_rows: list[dict[str, float | int | str]] = []
     for step in range(args.steps):
-        record = records[(step * dist.world_size + dist.rank) % len(records)]
-        clip_dir = args.cache_root / record.clip_id
-        if args.tip_feature_mode == "online_qwen":
-            clean = extract_qwen_visual_tokens_online(
-                record,
-                processor=qwen_processor,
-                model=qwen_model,
-                device=device,
-                dtype=next(model.parameters()).dtype,
-            )
-        else:
-            clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(
-                device=device,
-                dtype=next(model.parameters()).dtype,
-            )
-        layout = load_token_layout(clip_dir / "token_layout.safetensors")
-        graph = graph_to_device(load_graph_npz(clip_dir / "graph_coo.npz"), device)
-        frame_index = layout.frame_index.to(device)
-        if clean.shape[0] != graph.num_nodes or clean.shape[0] != layout.frame_index.numel():
-            raise RuntimeError(
-                f"TIP token count mismatch for {record.clip_id}: "
-                f"clean={clean.shape[0]}, graph={graph.num_nodes}, layout={layout.frame_index.numel()}"
-            )
+        batch_records = select_rank_batch(
+            records,
+            step=step,
+            rank=dist.rank,
+            world_size=dist.world_size,
+            batch_size=args.train_micro_batch_size_per_gpu,
+        )
+        clean_rows = []
+        frame_index_rows = []
+        graphs = []
+        frame_offset = 0
+        for record in batch_records:
+            clip_dir = args.cache_root / record.clip_id
+            if args.tip_feature_mode == "online_qwen":
+                clean = extract_qwen_visual_tokens_online(
+                    record,
+                    processor=qwen_processor,
+                    model=qwen_model,
+                    device=device,
+                    dtype=next(model.parameters()).dtype,
+                )
+            else:
+                clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(
+                    device=device,
+                    dtype=next(model.parameters()).dtype,
+                )
+            layout = load_token_layout(clip_dir / "token_layout.safetensors")
+            graph = load_graph_npz(clip_dir / "graph_coo.npz")
+            if clean.shape[0] != graph.num_nodes or clean.shape[0] != layout.frame_index.numel():
+                raise RuntimeError(
+                    f"TIP token count mismatch for {record.clip_id}: "
+                    f"clean={clean.shape[0]}, graph={graph.num_nodes}, layout={layout.frame_index.numel()}"
+                )
+            clean_rows.append(clean)
+            frame_index_rows.append(layout.frame_index.to(device) + frame_offset)
+            frame_offset += int(layout.num_frames)
+            graphs.append(graph)
+        clean = torch.cat(clean_rows, dim=0)
+        frame_index = torch.cat(frame_index_rows, dim=0)
+        graph = graph_to_device(pack_graphs(graphs), device)
 
         opt.zero_grad(set_to_none=True)
         loss, metrics = tip_loss_step(
@@ -113,7 +172,8 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
             "step": step + 1,
             "rank": dist.rank,
             "world_size": dist.world_size,
-            "clip_id": record.clip_id,
+            "clip_id": ",".join(record.clip_id for record in batch_records),
+            "micro_batch_size": len(batch_records),
             **metrics,
         }
         if (step + 1) % args.eval_every == 0 or step == args.steps - 1:
@@ -204,6 +264,7 @@ def main() -> None:
     parser.add_argument("--qwen-checkpoint", default="Qwen/Qwen3-VL-4B-Instruct")
     parser.add_argument("--dtype", choices=["float16", "bfloat16", "float32"], default="bfloat16")
     parser.add_argument("--log-every", type=int, default=20)
+    parser.add_argument("--train-micro-batch-size-per-gpu", type=int, default=1)
     args = parser.parse_args()
     seed_everything(3407)
 

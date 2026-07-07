@@ -17,6 +17,7 @@ from geowire.models.qwen3vl_cache import extract_qwen_visual_tokens_online, orde
 from geowire.training.checkpoints import load_torch_state, save_torch_state
 from geowire.training.distributed import average_gradients, barrier, broadcast_parameters, cleanup, init_distributed
 from geowire.training.pretrain_tip import tip_loss_step
+from geowire.types import SparseGraph
 from geowire.utils.io import write_json, write_jsonl
 from geowire.utils.reproducibility import seed_everything
 
@@ -85,21 +86,101 @@ def freeze_qwen_base(model) -> None:
             param.requires_grad_(False)
 
 
-def build_qa_inputs(processor, record: ClipRecord, *, device: torch.device):
+def pack_graphs(graphs: list[SparseGraph]) -> SparseGraph:
+    """Pack independent per-clip graphs into one disconnected graph."""
+
+    if not graphs:
+        raise ValueError("cannot pack an empty graph list")
+    dst_rows: list[torch.Tensor] = []
+    src_rows: list[torch.Tensor] = []
+    weight_rows: list[torch.Tensor] = []
+    edge_type_rows: list[torch.Tensor] = []
+    reproj_rows: list[torch.Tensor] = []
+    cycle_rows: list[torch.Tensor] = []
+    visibility_rows: list[torch.Tensor] = []
+    confidence_rows: list[torch.Tensor] = []
+    offset = 0
+    for graph in graphs:
+        dst_rows.append(graph.dst + offset)
+        src_rows.append(graph.src + offset)
+        weight_rows.append(graph.weight)
+        edge_type_rows.append(graph.edge_type)
+        reproj_rows.append(graph.reproj_error)
+        cycle_rows.append(graph.cycle_error)
+        visibility_rows.append(graph.visibility)
+        confidence_rows.append(graph.confidence)
+        offset += graph.num_nodes
+    return SparseGraph(
+        num_nodes=offset,
+        dst=torch.cat(dst_rows),
+        src=torch.cat(src_rows),
+        weight=torch.cat(weight_rows),
+        edge_type=torch.cat(edge_type_rows),
+        reproj_error=torch.cat(reproj_rows),
+        cycle_error=torch.cat(cycle_rows),
+        visibility=torch.cat(visibility_rows),
+        confidence=torch.cat(confidence_rows),
+    )
+
+
+def select_rank_batch(
+    items,
+    *,
+    step_index: int,
+    rank: int,
+    world_size: int,
+    batch_size: int,
+) -> list:
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+    start = step_index * world_size * batch_size + rank * batch_size
+    return [items[(start + local) % len(items)] for local in range(batch_size)]
+
+
+def collect_image_inputs(messages_list):
     from qwen_vl_utils import process_vision_info
 
-    prompt_messages = ordered_image_messages(record)
-    full_messages = [*prompt_messages, {"role": "assistant", "content": record.answer or ""}]
-    prompt_text = processor.apply_chat_template(prompt_messages, tokenize=False, add_generation_prompt=True)
-    full_text = processor.apply_chat_template(full_messages, tokenize=False, add_generation_prompt=False)
-    image_inputs, video_inputs = process_vision_info(prompt_messages)
-    if video_inputs:
-        raise ValueError("GeoWire Phase 2 uses ordered images, not Qwen video mode")
-    inputs = processor(text=[full_text], images=image_inputs, videos=None, padding=True, return_tensors="pt")
-    prompt_inputs = processor(text=[prompt_text], images=image_inputs, videos=None, padding=True, return_tensors="pt")
+    images = []
+    for messages in messages_list:
+        image_inputs, video_inputs = process_vision_info(messages)
+        if video_inputs:
+            raise ValueError("GeoWire Phase 2 uses ordered images, not Qwen video mode")
+        images.extend(image_inputs or [])
+    return images
+
+
+def build_qa_inputs(processor, records: ClipRecord | list[ClipRecord], *, device: torch.device):
+    if isinstance(records, ClipRecord):
+        batch_records = [records]
+    else:
+        batch_records = list(records)
+    prompt_messages_list = [ordered_image_messages(record) for record in batch_records]
+    full_messages_list = [
+        [*prompt_messages, {"role": "assistant", "content": record.answer or ""}]
+        for record, prompt_messages in zip(batch_records, prompt_messages_list, strict=True)
+    ]
+    prompt_texts = [
+        processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        for messages in prompt_messages_list
+    ]
+    full_texts = [
+        processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
+        for messages in full_messages_list
+    ]
+    image_inputs = collect_image_inputs(prompt_messages_list)
+    inputs = processor(text=full_texts, images=image_inputs, videos=None, padding=True, return_tensors="pt")
+    prompt_inputs = processor(text=prompt_texts, images=image_inputs, videos=None, padding=True, return_tensors="pt")
     labels = inputs["input_ids"].clone()
-    prompt_len = int(prompt_inputs["input_ids"].shape[-1])
-    labels[:, :prompt_len] = -100
+    prompt_attention = prompt_inputs.get("attention_mask")
+    input_attention = inputs.get("attention_mask")
+    if prompt_attention is None or input_attention is None:
+        prompt_len = int(prompt_inputs["input_ids"].shape[-1])
+        labels[:, :prompt_len] = -100
+    else:
+        prompt_lens = prompt_attention.sum(dim=-1).tolist()
+        for row, prompt_len in enumerate(prompt_lens):
+            valid = torch.nonzero(input_attention[row].bool(), as_tuple=False).flatten()
+            labels[row, valid[: int(prompt_len)]] = -100
     if getattr(processor, "tokenizer", None) is not None and processor.tokenizer.pad_token_id is not None:
         labels[inputs["input_ids"] == processor.tokenizer.pad_token_id] = -100
     inputs["labels"] = labels
@@ -169,36 +250,55 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
         if not use_deepspeed:
             opt.zero_grad(set_to_none=True)
         if use_tip:
-            record = tip_records[((step // (qa_to_tip + 1)) * dist.world_size + dist.rank) % len(tip_records)]
-            clip_dir = args.cache_root / record.clip_id
+            tip_step = step // (qa_to_tip + 1)
+            records = select_rank_batch(
+                tip_records,
+                step_index=tip_step,
+                rank=dist.rank,
+                world_size=dist.world_size,
+                batch_size=args.train_micro_batch_size_per_gpu,
+            )
             active_bridge = train_model.module if use_deepspeed else bridge
             tip_model = train_model.module.geowire if use_deepspeed else geowire
             tip_dtype = next(tip_model.parameters()).dtype
-            layout = load_token_layout(clip_dir / "token_layout.safetensors")
-            graph = graph_to_device(load_graph_npz(clip_dir / "graph_coo.npz"), device)
-            if args.tip_feature_mode == "online_qwen":
-                clean = extract_qwen_visual_tokens_online(
-                    record,
-                    processor=processor,
-                    model=active_bridge.base_model,
-                    device=device,
-                    dtype=tip_dtype,
-                )
-            else:
-                clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(
-                    device=device,
-                    dtype=tip_dtype,
-                )
-            if clean.shape[0] != graph.num_nodes or clean.shape[0] != layout.frame_index.numel():
-                raise RuntimeError(
-                    f"TIP token count mismatch for {record.clip_id}: "
-                    f"clean={clean.shape[0]}, graph={graph.num_nodes}, layout={layout.frame_index.numel()}"
-                )
+            clean_rows = []
+            frame_index_rows = []
+            graphs = []
+            frame_offset = 0
+            for record in records:
+                clip_dir = args.cache_root / record.clip_id
+                layout = load_token_layout(clip_dir / "token_layout.safetensors")
+                graph = load_graph_npz(clip_dir / "graph_coo.npz")
+                if args.tip_feature_mode == "online_qwen":
+                    clean = extract_qwen_visual_tokens_online(
+                        record,
+                        processor=processor,
+                        model=active_bridge.base_model,
+                        device=device,
+                        dtype=tip_dtype,
+                    )
+                else:
+                    clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(
+                        device=device,
+                        dtype=tip_dtype,
+                    )
+                if clean.shape[0] != graph.num_nodes or clean.shape[0] != layout.frame_index.numel():
+                    raise RuntimeError(
+                        f"TIP token count mismatch for {record.clip_id}: "
+                        f"clean={clean.shape[0]}, graph={graph.num_nodes}, layout={layout.frame_index.numel()}"
+                    )
+                clean_rows.append(clean)
+                frame_index_rows.append(layout.frame_index.to(device) + frame_offset)
+                frame_offset += int(layout.num_frames)
+                graphs.append(graph)
+            clean = torch.cat(clean_rows, dim=0)
+            frame_index = torch.cat(frame_index_rows, dim=0)
+            graph = graph_to_device(pack_graphs(graphs), device)
             loss, metrics = tip_loss_step(
                 tip_model,
                 clean,
                 graph,
-                layout.frame_index.to(device),
+                frame_index,
                 mask_ratio=args.mask_ratio,
                 lambda_sub=args.lambda_sub,
                 lambda_keep=args.lambda_keep,
@@ -209,13 +309,23 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
                 "rank": dist.rank,
                 "world_size": dist.world_size,
                 "mode": "tip",
-                "clip_id": record.clip_id,
+                "clip_id": ",".join(record.clip_id for record in records),
+                "micro_batch_size": len(records),
                 **metrics,
             }
         else:
-            record = qa_dataset[(step * dist.world_size + dist.rank) % len(qa_dataset)]
-            inputs = build_qa_inputs(processor, record, device=device)
-            graph = graph_to_device(load_graph_npz(args.cache_root / record.clip_id / "graph_coo.npz"), device)
+            records = select_rank_batch(
+                qa_dataset,
+                step_index=step,
+                rank=dist.rank,
+                world_size=dist.world_size,
+                batch_size=args.train_micro_batch_size_per_gpu,
+            )
+            inputs = build_qa_inputs(processor, records, device=device)
+            graph = graph_to_device(
+                pack_graphs([load_graph_npz(args.cache_root / record.clip_id / "graph_coo.npz") for record in records]),
+                device,
+            )
             outputs = train_model(graph=graph, **inputs)
             loss = outputs.loss
             row = {
@@ -223,7 +333,8 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
                 "rank": dist.rank,
                 "world_size": dist.world_size,
                 "mode": "qa",
-                "clip_id": record.clip_id,
+                "clip_id": ",".join(record.clip_id for record in records),
+                "micro_batch_size": len(records),
                 "loss": float(loss.detach()),
             }
         if use_deepspeed:

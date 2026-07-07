@@ -16,6 +16,7 @@ REQUIRE_REAL_CACHE="${REQUIRE_REAL_CACHE:-1}"
 MIN_CROSS_FRAME_COVERAGE="${MIN_CROSS_FRAME_COVERAGE:-0.01}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-1}"
 PYTHONPATH_PREFIX="${PYTHONPATH_PREFIX:-${PROJECT_ROOT}}"
+TRAIN_MICRO_BATCH_SIZE_PER_GPU="${TRAIN_MICRO_BATCH_SIZE_PER_GPU:-1}"
 
 cd "${PROJECT_ROOT}"
 mkdir -p "${OUTPUT_DIR}" logs/tmux
@@ -38,9 +39,9 @@ if tmux has-session -t "${SESSION}" 2>/dev/null; then
   exit 1
 fi
 
-TRAIN_CMD="'${PYTHON_BIN}' scripts/train_tip.py --manifest '${MANIFEST}' --cache-root '${CACHE_ROOT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --device '${DEVICE}' --tip-feature-mode '${TIP_FEATURE_MODE}' --qwen-checkpoint '${QWEN_CHECKPOINT}' --dtype '${DTYPE}'"
+TRAIN_CMD="'${PYTHON_BIN}' scripts/train_tip.py --manifest '${MANIFEST}' --cache-root '${CACHE_ROOT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --device '${DEVICE}' --tip-feature-mode '${TIP_FEATURE_MODE}' --qwen-checkpoint '${QWEN_CHECKPOINT}' --dtype '${DTYPE}' --train-micro-batch-size-per-gpu '${TRAIN_MICRO_BATCH_SIZE_PER_GPU}'"
 if [[ "${NPROC_PER_NODE}" != "1" ]]; then
-  TRAIN_CMD="'${PYTHON_BIN}' -m torch.distributed.run --standalone --nproc_per_node='${NPROC_PER_NODE}' scripts/train_tip.py --manifest '${MANIFEST}' --cache-root '${CACHE_ROOT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --device '${DEVICE}' --tip-feature-mode '${TIP_FEATURE_MODE}' --qwen-checkpoint '${QWEN_CHECKPOINT}' --dtype '${DTYPE}'"
+  TRAIN_CMD="'${PYTHON_BIN}' -m torch.distributed.run --standalone --nproc_per_node='${NPROC_PER_NODE}' scripts/train_tip.py --manifest '${MANIFEST}' --cache-root '${CACHE_ROOT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --device '${DEVICE}' --tip-feature-mode '${TIP_FEATURE_MODE}' --qwen-checkpoint '${QWEN_CHECKPOINT}' --dtype '${DTYPE}' --train-micro-batch-size-per-gpu '${TRAIN_MICRO_BATCH_SIZE_PER_GPU}'"
 fi
 
 tmux new-session -d -s "${SESSION}" "cd '${PROJECT_ROOT}' && env PYTHONPATH='${PYTHONPATH_PREFIX}:${PYTHONPATH:-}' ${TRAIN_CMD} > 'logs/tmux/${SESSION}.log' 2>&1; echo EXIT_CODE=\$? >> 'logs/tmux/${SESSION}.log'"

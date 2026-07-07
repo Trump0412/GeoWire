@@ -91,9 +91,9 @@ Training data to include:
 |---|---:|---|---|
 | LLaVA-Hound | 63,750 | Phase 1/2 | natural video semantics and temporal-spatial QA |
 | SPAR / spar_234k | 234,277 | Phase 0/1/2 | multi-view spatial relations and RGB-D style evidence |
-| VSI-590K | 590,667 | Phase 2 scaled run after leakage audit | large spatial instruction tuning |
-| VLM3R-VSI | 205,456 | Phase 2 scaled run after leakage audit | view-spatial instruction data |
-| VLM3R-VST | 132,568 | Phase 2 scaled run after leakage audit | temporal/view-spatial instruction data |
+| VSI-590K | 590,667 | Phase 2 | large spatial instruction tuning |
+| VLM3R-VSI | 205,456 | Phase 2 | view-spatial instruction data |
+| VLM3R-VST | 132,568 | Phase 2 | temporal/view-spatial instruction data |
 | JoyAI OpenSpatial | 100,000 | Phase 2 | diverse spatial QA |
 | MindCube | 10,000 | Phase 2 | structured multi-view/mind-cube spatial reasoning |
 
@@ -101,15 +101,15 @@ Data not used for GeoWire training:
 
 - SpatialLadder is not part of this GeoWire protocol.
 - VSI-Bench, ReVSI, MMSI, DSR-Bench, ViewSpatial-style benchmark validation or
-  test QA are evaluation-only unless a source-scene audit proves there is no
-  overlap and the run is explicitly marked as scaled training.
+  test QA remain evaluation-only. Training uses the prepared VSI-590K/VLM3R
+  training data by decision.
 
-Leakage control:
+Run control:
 
-- Every real run must write a `leakage_audit.json`.
-- Scene/video IDs must be removed at scene level, not only by file name.
-- VLM3R/VSI-derived data must be separated into Core-Clean and Scaled regimes.
-  If scene overlap cannot be certified, it must not be used for the main table.
+- Every real run must write its exact manifest, source list, git commit, cache
+  backend, and training launch command.
+- VSI-590K and VLM3R are approved for the formal GeoWire training mixture.
+- There is no third training stage in the approved plan.
 
 ## 3. Phase 0: Manifest and Graph Preparation
 
@@ -269,23 +269,39 @@ lr: 2.0e-5
 precision: bf16
 ```
 
-Initial data mixture for a Core-Clean run:
+Formal first-run decision:
+
+```yaml
+hardware: 8 x A100 80GB
+fine_tuning: LoRA first
+full_parameter_tuning: ablation only after LoRA signal is known
+cache_backend_first_run: qwen_layout_grid
+approved_large_sources:
+  - VSI-590K
+  - VLM3R-VSI
+  - VLM3R-VST
+```
+
+LoRA vs full-parameter note:
+
+- LoRA trains a small adapter subset, so it is faster, more stable, and leaves
+  room to increase per-GPU batch size on 8 x A100.
+- Full-parameter tuning trains the whole decoder stack and requires much more
+  optimizer/gradient memory. It should use ZeRO-3/FSDP-style sharding and is not
+  the right first run for isolating GeoWire's contribution.
+- The formal first run therefore uses Qwen LoRA + trainable GeoWire; full-param
+  is a later comparison if LoRA shows a useful signal.
+
+Initial formal Phase 2 data mixture:
 
 | Data | Suggested share | Notes |
 |---|---:|---|
 | SPAR / spar_234k | 25% | multi-view spatial relation and RGB-D style questions |
-| VSI-590K audited subset | 20% | only after scene/video leakage audit |
-| VLM3R-VSI/VST audited subset | 20% | keep separated from eval scenes |
+| VSI-590K | 25% | approved formal training source |
+| VLM3R-VSI/VST | 25% | approved formal training source |
 | LLaVA-Hound | 15% | natural video semantics and temporal reasoning |
 | JoyAI OpenSpatial | 15% | diverse spatial QA |
 | MindCube | 5% | structured multi-view reasoning |
-
-If leakage cannot be fully certified for VSI/VLM3R-derived sources, produce two
-runs:
-
-- `Core-Clean`: only sources with certified non-overlap;
-- `Scaled`: includes large audited-but-riskier spatial instruction data and is
-  reported separately.
 
 Phase 2 pass conditions:
 
@@ -296,22 +312,22 @@ Phase 2 pass conditions:
   the easiest raw metric;
 - memory and throughput meet the utilization target.
 
-## 6. Phase 3: Optional Scaling and Ablations
+## 6. Follow-Up Ablations
 
-Phase 3 is not the main method. It begins only after Phase 1 and Phase 2 show a
-real mechanism signal.
+There is no third training stage. After the two formal stages, only ablations
+and comparison runs are allowed.
 
-Allowed Phase 3 work:
+Allowed follow-up work:
 
 - longer frame counts: 16 -> 32;
 - Qwen2.5-VL-7B compatibility run for comparison with older ecosystems;
 - GeoVR/geometry-aware base-model comparison if needed;
-- Scaled training with more audited VSI/VLM3R data;
+- LoRA vs full-parameter fine-tuning comparison if the LoRA run is promising;
 - DSR-Bench and long-video evaluation.
 
 Not allowed:
 
-- claiming Phase 3 additions are required by the core GeoWire method;
+- calling these ablations a third stage;
 - mixing benchmark validation/test QA into training;
 - treating SpatialLadder as a GeoWire training source.
 
@@ -417,7 +433,7 @@ launch_command.sh
 ## 10. Immediate TODO Before Formal Training
 
 1. Implement true per-device batching / graph packing in `train_tip.py` and
-   `train_sft.py`.
+   `train_sft.py`. Status: implemented for formal LoRA launch.
 2. Build unified manifests for all selected GeoWire datasets, excluding
    SpatialLadder.
 3. Build compact graph caches for real train clips.
@@ -426,4 +442,3 @@ launch_command.sh
 6. Launch Phase 1 real TIP.
 7. Launch Phase 2 SFT with `15 QA : 1 TIP`.
 8. Start evaluation jobs from the first real Phase 2 checkpoint.
-
