@@ -271,7 +271,7 @@ def main() -> None:
     parser.add_argument("--lambda-keep", type=float, default=0.02)
     parser.add_argument("--device", default="cpu")
     parser.add_argument("--tip-feature-mode", choices=["cached", "online_qwen"], default="cached")
-    parser.add_argument("--qwen-checkpoint", default="Qwen/Qwen3-VL-4B-Instruct")
+    parser.add_argument("--qwen-checkpoint", default="Qwen/Qwen3-VL-2B-Instruct")
     parser.add_argument("--dtype", choices=["float16", "bfloat16", "float32"], default="bfloat16")
     parser.add_argument("--log-every", type=int, default=20)
     parser.add_argument("--train-micro-batch-size-per-gpu", type=int, default=1)

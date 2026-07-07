@@ -181,7 +181,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--cache-root", type=Path, required=True)
-    parser.add_argument("--qwen-checkpoint", default="/mnt/guojh/lq/new/weights/base_models/Qwen3-VL-4B-Instruct")
+    parser.add_argument("--qwen-checkpoint", default="/mnt/guojh/lq/new/models/Qwen/Qwen3-VL-2B-Instruct")
     parser.add_argument("--num-shards", type=int, default=1)
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--limit", type=int)

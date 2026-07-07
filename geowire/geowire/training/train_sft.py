@@ -414,7 +414,7 @@ def main() -> None:
     parser.add_argument("--qa-manifest", type=Path, required=True)
     parser.add_argument("--tip-manifest", type=Path)
     parser.add_argument("--cache-root", type=Path, required=True)
-    parser.add_argument("--qwen-checkpoint", default="Qwen/Qwen3-VL-4B-Instruct")
+    parser.add_argument("--qwen-checkpoint", default="Qwen/Qwen3-VL-2B-Instruct")
     parser.add_argument("--phase1-checkpoint", type=Path)
     parser.add_argument("--output", type=Path, default=Path("runs/phase2_sft"))
     parser.add_argument("--steps", type=int, default=10)

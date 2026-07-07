@@ -20,7 +20,7 @@
 | 核心问题定义 | 冻结 | 只有在 Phase 1 失败后才允许改变 |
 | GeoWire 主架构 | 冻结 | 不新增 bank、router、实体记忆或几何 feature fusion |
 | 几何模型 | 冻结为 VGGT | 第一篇不切换至 DA3；可做 VGGT-Ω 的附录验证 |
-| 语言模型主干 | 主模型暂定 Qwen3-VL-4B | 可替换同族 checkpoint，但不得改变“visual encoder → GeoWire → merger → LLM”的接口 |
+| 语言模型主干 | 正式首跑暂定 Qwen3-VL-2B | 可替换同族 checkpoint，但不得改变“visual encoder → GeoWire → merger → LLM”的接口；Qwen3-VL-4B 保留为 pilot / comparison |
 | 训练损失、边阈值、采样策略 | 开放 | 通过实验和消融更新 |
 | benchmark 优先级 | 主表冻结 | 新 benchmark 只能作为补充，不可挤占主表 |
 | 论文创新主张 | 冻结 | 只围绕 control-plane 与 topology intervention，不宣称新任务 |
@@ -449,7 +449,7 @@ D_{\text{KL}}\big(p(y\mid H,P_G),p(y\mid \Pi H,\Pi P_G\Pi^\top)\big)
 | 组件 | 选择 | 角色 |
 |---|---|---|
 | Geometry teacher | VGGT-1B | 冻结，离线几何 cache 与 graph builder |
-| 主 VLM | Qwen3-VL-4B-Instruct | 主结果模型；兼顾竞争力、可训练性与 GeoVR 可比性 |
+| 主 VLM | Qwen3-VL-2B-Instruct | 正式首跑模型；优先缩短工程闭环并提高 batch ramp 余量，Qwen3-VL-4B-Instruct 保留为对照 |
 | 小模型验证 | Qwen3-VL-2B-Instruct | 证明几何拓扑可在小模型上带来结构性收益 |
 | 兼容性对照 | Qwen2.5-VL-7B-Instruct | 仅用于与 VG-LLM / 已有代码生态的公平比较 |
 
@@ -837,7 +837,7 @@ GeoWire 与之正交：
 
 | 问题 | 可选范围 | 决策依据 |
 |---|---|---|
-| 主 VLM | Qwen3-VL-4B 优先；Qwen3-VL-2B 与 Qwen2.5-VL-7B 对照 | 代码可插入性、稳定性、可比性 |
+| 主 VLM | Qwen3-VL-2B 正式首跑；Qwen3-VL-4B 与 Qwen2.5-VL-7B 对照 | 代码可插入性、稳定性、可比性 |
 | graph 采样 | patch center / 多点采样 / adaptive sampling | Phase 0 edge precision 与覆盖率 |
 | edge 数 K | 2/4/8 | 性能、泄漏、算力 |
 | block 数 | 1/2/3 | 过平滑与任务收益 |
@@ -896,4 +896,3 @@ Phase 1: TIP, train GeoWire only
 Phase 2: spatial instruction tuning, train GeoWire + merger LoRA + LLM LoRA
 Phase 3: optional scaling/orthogonal extension
 ```
-

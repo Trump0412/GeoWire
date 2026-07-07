@@ -15,7 +15,7 @@ from geowire.models.qwen3vl_vision import require_qwen3vl_transformers_support
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--checkpoint", default="Qwen/Qwen3-VL-4B-Instruct")
+    parser.add_argument("--checkpoint", default="Qwen/Qwen3-VL-2B-Instruct")
     parser.add_argument("--write", type=Path)
     parser.add_argument("--load-model", action="store_true")
     args = parser.parse_args()

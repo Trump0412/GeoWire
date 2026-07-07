@@ -61,8 +61,8 @@ Download pinned resources through the mirror:
 
 ```bash
 export HF_ENDPOINT=https://hf-mirror.com
-python scripts/download_resources.py model Qwen/Qwen3-VL-4B-Instruct \
-  --local-dir /mnt/guojh/lq/new/weights/base_models/Qwen3-VL-4B-Instruct
+python scripts/download_resources.py model Qwen/Qwen3-VL-2B-Instruct \
+  --local-dir /mnt/guojh/lq/new/models/Qwen/Qwen3-VL-2B-Instruct
 ```
 
 ## Distributed Launch

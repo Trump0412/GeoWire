@@ -273,7 +273,7 @@ tip:
 
 ```yaml
 model:
-  qwen_checkpoint: Qwen/Qwen3-VL-4B-Instruct
+  qwen_checkpoint: Qwen/Qwen3-VL-2B-Instruct
   freeze_vision: true
   geowire_blocks: 2
   top_k_edges: 4

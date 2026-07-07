@@ -121,8 +121,9 @@ cached Phase 1 gate, not real paper training.
 ## Server Resource Check
 
 - `Qwen3-VL-4B-Instruct`: present at `/mnt/guojh/lq/new/weights/base_models/Qwen3-VL-4B-Instruct` (`8.3G`).
-- `Qwen3-VL-2B-Instruct`: planned formal model; not yet present in the shared
-  weight root as of the latest check.
+- `Qwen3-VL-2B-Instruct`: present and load-checked at
+  `/mnt/guojh/lq/new/models/Qwen/Qwen3-VL-2B-Instruct`
+  (`model.safetensors` size: 4,255,140,312 bytes).
 - `VGGT-1B`: present at `/mnt/guojh/lq/new/weights/base_models/VGGT-1B` (`9.4G`).
 - Shared conda env still has `transformers==4.50.0`; GeoWire uses project-local overlay
   `/mnt/guojh/lq/new/GeoWire/.deps/transformers_4_57_6` for Qwen3-VL.
@@ -310,8 +311,8 @@ Current formal decision:
 ```text
 Do not launch the next long cache/training pass on Qwen3-VL-4B-Instruct.
 Use the already validated 4B path only as a pilot reference.
-Download/sync Qwen3-VL-2B-Instruct, then rerun the memory ramp and launch the
-formal 8-card run from the 2B path.
+Use the verified `/mnt/guojh/lq/new/models/Qwen/Qwen3-VL-2B-Instruct` path,
+then rerun the memory ramp and launch the formal 8-card run from the 2B path.
 ```
 
 Node218 8-GPU online-Qwen pilot:
@@ -395,7 +396,6 @@ python scripts/evaluate.py \
 
 ## Gated Before Full Real Training
 
-- `Qwen3-VL-2B-Instruct` must be present under `/mnt/guojh/lq/new/weights/base_models`.
 - 2B `qwen_layout_grid` cache/ramp must pass on the formal manifests.
 - Graph thresholds must be calibrated on real clips with visual overlay audit; the smoke used loose thresholds only to verify the engineering path.
 - Phase 1 should not advance to paper Phase 2 claims until full graph beats self/random/shuffled controls on a real validation subset.

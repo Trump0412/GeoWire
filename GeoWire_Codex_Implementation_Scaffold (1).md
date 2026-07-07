@@ -1,10 +1,10 @@
 # GeoWire：Codex 实现脚手架与代码执行规范
 
-> **用途**：本文件是 Codex 的直接实施合同。Codex 必须以 `GeoWire_Master_Design.md` 为最高理论约束，以本文件为唯一的工程拆解、接口定义、验收标准和执行顺序。  
-> **版本**：`v0.2`  
-> **日期**：2026-07-05  
-> **目标仓库名**：`geowire`  
-> **主模型**：`Qwen3-VL-4B-Instruct` + frozen `VGGT-1B`  
+> **用途**：本文件是 Codex 的直接实施合同。Codex 必须以 `GeoWire_Master_Design.md` 为最高理论约束，以本文件为唯一的工程拆解、接口定义、验收标准和执行顺序。
+> **版本**：`v0.2`
+> **日期**：2026-07-05
+> **目标仓库名**：`geowire`
+> **主模型**：`Qwen3-VL-2B-Instruct` + frozen `VGGT-1B`
 > **第一阶段目标**：先证明 **正确几何图能够恢复与隔离语义 token**；在此以前不得启动大规模 spatial QA SFT。
 
 > **v0.2 training override**：`GeoWire_Training_Protocol.md` 覆盖本文件旧版 TIP 内容。Codex 必须执行：Phase 1 仅优化 `L_rec + λ_sub L_sub (+ optional low-weight L_keep)`；`Non-edge isolation` 仅作为诊断，不得作为训练 loss；support substitution 必须在 masked target 上执行；Phase 2 按 `3 QA batches : 1 TIP batch` 交替训练。
@@ -248,11 +248,11 @@ pip freeze > requirements-lock.txt
 - GeoWire 不修改 `third_party/vggt` 内代码；所有包装逻辑置于 `geowire/geometry/vggt_provider.py`；
 - 默认 checkpoint：`facebook/VGGT-1B`；若使用 commercial checkpoint，须明确记录许可证和权重名。
 
-官方 VGGT 的 `VGGT.forward(images, query_points)` 会返回 pose、depth、depth confidence、world points，并可在指定 query points 时返回 tracks、visibility 和 confidence。当前官方代码要求 query points 的形状为 `[B, N, 2]`，且 tracker 将输入 sequence 的第 0 帧视为 query reference frame。因此任意 source frame 的 track 不能被假设为“一个前向自动得到”，必须显式处理 anchor frame。 
+官方 VGGT 的 `VGGT.forward(images, query_points)` 会返回 pose、depth、depth confidence、world points，并可在指定 query points 时返回 tracks、visibility 和 confidence。当前官方代码要求 query points 的形状为 `[B, N, 2]`，且 tracker 将输入 sequence 的第 0 帧视为 query reference frame。因此任意 source frame 的 track 不能被假设为“一个前向自动得到”，必须显式处理 anchor frame。
 
 ## 3.3 Qwen3-VL 固定版本
 
-- 主 checkpoint：`Qwen/Qwen3-VL-4B-Instruct`；
+- 主 checkpoint：`Qwen/Qwen3-VL-2B-Instruct`；
 - `qwen-vl-utils`、`transformers` 必须固定到 M0 验证通过的版本；
 - Phase 0/1 用 **多图像序列**，每帧作为独立 image placeholder 输入，而不是 Qwen video mode；
 - 原因：多图像模式能够保留“每帧 token layout”的确定映射，避免视频时间压缩导致 Qwen token 与 VGGT frame/pixel 对齐不明确；
@@ -464,7 +464,7 @@ num_nodes                int64 [1]
   "clip_id": "...",
   "vggt_repo_commit": "...",
   "vggt_checkpoint": "facebook/VGGT-1B",
-  "qwen_checkpoint": "Qwen/Qwen3-VL-4B-Instruct",
+  "qwen_checkpoint": "Qwen/Qwen3-VL-2B-Instruct",
   "transformers_version": "...",
   "qwen_vl_utils_version": "...",
   "vggt_preprocess_mode": "pad",
@@ -1274,7 +1274,7 @@ torchrun --nproc_per_node=6 scripts/train_tip.py \
   --config configs/phase1_tip.yaml \
   data.manifest=/path/to/train_manifest.jsonl \
   data.cache_root=/path/to/cache \
-  runtime.output_dir=runs/tip_qwen3vl4b_k4
+  runtime.output_dir=runs/tip_qwen3vl2b_k4
 ```
 
 初始配置：
@@ -1282,7 +1282,7 @@ torchrun --nproc_per_node=6 scripts/train_tip.py \
 ```yaml
 seed: 3407
 model:
-  qwen_checkpoint: Qwen/Qwen3-VL-4B-Instruct
+  qwen_checkpoint: Qwen/Qwen3-VL-2B-Instruct
   freeze_vision: true
   geowire_blocks: 2
   geowire_dropout: 0.0
@@ -1615,7 +1615,7 @@ geometry:
   use_unprojected_points: true
 
 qwen:
-  checkpoint: Qwen/Qwen3-VL-4B-Instruct
+  checkpoint: Qwen/Qwen3-VL-2B-Instruct
   input_mode: ordered_images
   min_pixels: 262144
   max_pixels: 1048576

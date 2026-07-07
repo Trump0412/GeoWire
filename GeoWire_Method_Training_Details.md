@@ -386,7 +386,7 @@ Why the current pilot underuses memory:
 
 - one record per GPU per step;
 - 8-frame smoke clips;
-- frozen Qwen3-VL-4B is relatively small for 80GB cards;
+- the frozen Qwen3-VL-4B pilot was still relatively small for 80GB cards;
 - ZeRO-2 partitions optimizer state/gradients but does not increase activation
   memory by itself;
 - gradient accumulation increases update batch, not per-step memory.
@@ -455,8 +455,8 @@ Required reports:
 Use names that encode the critical settings:
 
 ```text
-geowire_p1_tip_qwen3vl4b_onlineqwen_f16_bpg4_8a100_YYYYMMDD
-geowire_p2_sft_qwen3vl4b_zero2_qa15tip1_f16_bpg4_8a100_YYYYMMDD
+geowire_p1_tip_qwen3vl2b_onlineqwen_f16_bpg4_8a100_YYYYMMDD
+geowire_p2_sft_qwen3vl2b_zero2_qa15tip1_f16_bpg4_8a100_YYYYMMDD
 geowire_eval_vsi_p2_f16_ckptSTEP_YYYYMMDD
 ```
 
@@ -479,7 +479,9 @@ launch_command.sh
    `train_sft.py`. Status: done.
 2. Build unified manifests for all selected GeoWire datasets, excluding
    SpatialLadder. Status: done.
-3. Download or sync `Qwen3-VL-2B-Instruct` under the shared weight root.
+3. Download or sync `Qwen3-VL-2B-Instruct` under the shared model root.
+   Status: done; verified at
+   `/mnt/guojh/lq/new/models/Qwen/Qwen3-VL-2B-Instruct`.
 4. Build `qwen_layout_grid` cache with the 2B processor/checkpoint path.
 5. Run a 512- or 1024-sample 8-card memory ramp.
 6. Select the largest stable setting that keeps A100 memory around 65-75 GB.

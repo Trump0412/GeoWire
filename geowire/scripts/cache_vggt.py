@@ -240,7 +240,7 @@ def main() -> None:
     parser.add_argument("--cache-root", type=Path, default=Path("runs/toy_cache"))
     parser.add_argument("--backend", choices=["toy", "real"], default="toy")
     parser.add_argument("--hidden-size", type=int, default=16)
-    parser.add_argument("--qwen-checkpoint", default="Qwen/Qwen3-VL-4B-Instruct")
+    parser.add_argument("--qwen-checkpoint", default="Qwen/Qwen3-VL-2B-Instruct")
     parser.add_argument("--vggt-checkpoint", default="facebook/VGGT-1B")
     parser.add_argument("--vggt-source", type=Path, default=Path("third_party/vggt"))
     parser.add_argument("--device", default="cuda")
