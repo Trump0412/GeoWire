@@ -3,12 +3,14 @@
 Geometry-wired cross-frame semantic transport for video spatial reasoning.
 
 This Git repository is rooted at `/home/chenbp/GeoWire`. The Python package and
-training scaffold live in `geowire/`. The three top-level design documents are
-kept at the repository root and mirrored into `geowire/docs/`:
+training scaffold live in `geowire/`. The top-level design and control
+documents are kept at the repository root and mirrored into `geowire/docs/`
+where applicable:
 
 - `GeoWire_Master_Design (2).md`
 - `GeoWire_Codex_Implementation_Scaffold (1).md`
 - `GeoWire_Training_Protocol.md`
+- `GeoWire_Method_Training_Details.md`
 
 ## Quick Smoke
 
@@ -65,8 +67,9 @@ SESSION=geowire_phase1_tip \
 ./scripts/launch_phase1_tip_tmux.sh
 ```
 
-The cache for each clip must contain `token_layout.safetensors`,
-`semantic_tokens.safetensors`, `graph_coo.npz`, and `metadata.json`.
+With the default `TIP_FEATURE_MODE=online_qwen`, each clip needs
+`token_layout.safetensors`, `graph_coo.npz`, and `metadata.json`.
+`semantic_tokens.safetensors` is optional and mainly used for cached debug runs.
 
 ## Shared Server Layout
 

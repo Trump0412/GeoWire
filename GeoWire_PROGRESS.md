@@ -1,6 +1,6 @@
 # GeoWire Progress
 
-Last updated: 2026-07-06
+Last updated: 2026-07-07
 
 ## Current Status
 
@@ -9,6 +9,8 @@ Last updated: 2026-07-06
 - Python package root is `/home/chenbp/GeoWire/geowire`.
 - The v0.2 master design, implementation scaffold and training protocol are
   mirrored into `geowire/docs/`.
+- `GeoWire_Method_Training_Details.md` now records the pre-experiment method,
+  loss, data, memory-utilization, ETA, and go/no-go gates.
 
 ## Implemented Software Loop
 
