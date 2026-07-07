@@ -36,6 +36,7 @@ def check_phase1_cache(
     manifest: Path | None,
     cache_root: Path | None,
     *,
+    tip_feature_mode: str = "cached",
     require_real_cache: bool = False,
     min_cross_frame_coverage: float = 0.0,
 ) -> tuple[bool, list[str], dict[str, object]]:
@@ -54,7 +55,9 @@ def check_phase1_cache(
     missing: dict[str, list[str]] = {}
     for record in records:
         clip_dir = cache_root / record.clip_id
-        needed = ["token_layout.safetensors", "semantic_tokens.safetensors", "graph_coo.npz", "metadata.json"]
+        needed = ["token_layout.safetensors", "graph_coo.npz", "metadata.json"]
+        if tip_feature_mode == "cached":
+            needed.append("semantic_tokens.safetensors")
         if require_real_cache:
             needed.append("geometry.safetensors")
         absent = [name for name in needed if not (clip_dir / name).exists()]
@@ -64,18 +67,18 @@ def check_phase1_cache(
         try:
             metadata = read_cache_metadata(clip_dir)
             layout = load_token_layout(clip_dir / "token_layout.safetensors")
-            hidden = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors")
             graph = load_graph_npz(clip_dir / "graph_coo.npz")
+            hidden = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors") if tip_feature_mode == "cached" else None
         except Exception as exc:  # noqa: BLE001 - readiness should report all cache failures
             missing[record.clip_id] = [f"invalid cache: {exc}"]
             continue
         if require_real_cache and metadata.get("backend") != "real":
             missing[record.clip_id] = [f"backend is {metadata.get('backend')!r}, expected 'real'"]
             continue
-        if hidden.shape[0] != layout.frame_index.numel():
+        if hidden is not None and hidden.shape[0] != layout.frame_index.numel():
             missing[record.clip_id] = [f"semantic token count {hidden.shape[0]} != layout nodes {layout.frame_index.numel()}"]
             continue
-        if hidden.shape[-1] != layout.hidden_size:
+        if hidden is not None and hidden.shape[-1] != layout.hidden_size:
             missing[record.clip_id] = [f"semantic hidden size {hidden.shape[-1]} != layout hidden size {layout.hidden_size}"]
             continue
         if graph.num_nodes != layout.frame_index.numel():
@@ -91,6 +94,7 @@ def check_phase1_cache(
         if coverage < min_cross_frame_coverage:
             missing[record.clip_id] = [f"cross-frame coverage {coverage:.4f} < {min_cross_frame_coverage:.4f}"]
     detail["records"] = len(records)
+    detail["tip_feature_mode"] = tip_feature_mode
     detail["missing_cache_files"] = missing
     if missing:
         errors.append(f"{len(missing)} clips are missing required cache files")
@@ -129,16 +133,18 @@ def main() -> None:
     parser.add_argument("--qwen-path", type=Path, default=Path("/mnt/guojh/lq/new/weights/base_models/Qwen3-VL-4B-Instruct"))
     parser.add_argument("--vggt-path", type=Path, default=Path("/mnt/guojh/lq/new/weights/base_models/VGGT-1B"))
     parser.add_argument("--require-real-cache", action="store_true")
+    parser.add_argument("--tip-feature-mode", choices=["cached", "online_qwen"], default="cached")
     parser.add_argument("--min-cross-frame-coverage", type=float, default=0.0)
     parser.add_argument("--parity-report", type=Path)
     parser.add_argument("--write", type=Path)
     args = parser.parse_args()
 
     errors: list[str] = []
-    require_real_cache = args.require_real_cache or args.phase == "phase2"
+    require_real_cache = args.require_real_cache or (args.phase == "phase2" and args.tip_feature_mode == "cached")
     phase1_ok, phase1_errors, phase1_detail = check_phase1_cache(
         args.manifest,
         args.cache_root,
+        tip_feature_mode=args.tip_feature_mode,
         require_real_cache=require_real_cache,
         min_cross_frame_coverage=args.min_cross_frame_coverage,
     )
@@ -175,6 +181,7 @@ def main() -> None:
         "qwen3vl_support": {"passed": qwen_ok, "message": qwen_message},
         "parity": {"passed": parity_ok, "message": parity_message, **parity_detail},
         "require_real_cache": require_real_cache,
+        "tip_feature_mode": args.tip_feature_mode,
     }
     text = json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True)
     print(text)

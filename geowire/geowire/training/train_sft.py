@@ -13,7 +13,7 @@ from geowire.geometry.graph_io import load_graph_npz
 from geowire.geometry.vggt_cache import load_semantic_tokens, load_token_layout
 from geowire.models.geowire import GeoWireTransport
 from geowire.models.qwen3vl_bridge import Qwen3VLGeoWireForConditionalGeneration, graph_to_device
-from geowire.models.qwen3vl_cache import ordered_image_messages
+from geowire.models.qwen3vl_cache import extract_qwen_visual_tokens_online, ordered_image_messages
 from geowire.training.checkpoints import load_torch_state, save_torch_state
 from geowire.training.distributed import average_gradients, barrier, broadcast_parameters, cleanup, init_distributed
 from geowire.training.pretrain_tip import tip_loss_step
@@ -171,11 +171,29 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
         if use_tip:
             record = tip_records[((step // (qa_to_tip + 1)) * dist.world_size + dist.rank) % len(tip_records)]
             clip_dir = args.cache_root / record.clip_id
+            active_bridge = train_model.module if use_deepspeed else bridge
             tip_model = train_model.module.geowire if use_deepspeed else geowire
             tip_dtype = next(tip_model.parameters()).dtype
-            clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(device=device, dtype=tip_dtype)
             layout = load_token_layout(clip_dir / "token_layout.safetensors")
             graph = graph_to_device(load_graph_npz(clip_dir / "graph_coo.npz"), device)
+            if args.tip_feature_mode == "online_qwen":
+                clean = extract_qwen_visual_tokens_online(
+                    record,
+                    processor=processor,
+                    model=active_bridge.base_model,
+                    device=device,
+                    dtype=tip_dtype,
+                )
+            else:
+                clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(
+                    device=device,
+                    dtype=tip_dtype,
+                )
+            if clean.shape[0] != graph.num_nodes or clean.shape[0] != layout.frame_index.numel():
+                raise RuntimeError(
+                    f"TIP token count mismatch for {record.clip_id}: "
+                    f"clean={clean.shape[0]}, graph={graph.num_nodes}, layout={layout.frame_index.numel()}"
+                )
             loss, metrics = tip_loss_step(
                 tip_model,
                 clean,
@@ -263,6 +281,7 @@ def main() -> None:
     parser.add_argument("--log-every", type=int, default=1)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--dtype", choices=["float16", "bfloat16", "float32"], default="bfloat16")
+    parser.add_argument("--tip-feature-mode", choices=["online_qwen", "cached"], default="online_qwen")
     parser.add_argument("--deepspeed-config", type=Path)
     parser.add_argument("--train-micro-batch-size-per-gpu", type=int, default=1)
     parser.add_argument("--gradient-accumulation-steps", type=int, default=1)

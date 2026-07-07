@@ -15,6 +15,7 @@ from geowire.geometry.graph_builder import EdgeCandidates, build_graph
 from geowire.geometry.graph_io import load_graph_npz
 from geowire.geometry.vggt_cache import load_semantic_tokens, load_token_layout
 from geowire.models.geowire import GeoWireTransport
+from geowire.models.qwen3vl_cache import extract_qwen_visual_tokens_online, load_qwen_processor_and_model
 from geowire.training.checkpoints import save_torch_state
 from geowire.training.distributed import average_gradients, barrier, broadcast_parameters, cleanup, init_distributed
 from geowire.training.pretrain_tip import graph_control_metrics, run_tip_debug_step, tip_loss_step
@@ -43,7 +44,26 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
     if not records:
         raise SystemExit("manifest is empty")
 
-    first_hidden = load_semantic_tokens(args.cache_root / records[0].clip_id / "semantic_tokens.safetensors")
+    qwen_processor = None
+    qwen_model = None
+    dtype = getattr(torch, args.dtype)
+    if args.tip_feature_mode == "online_qwen":
+        qwen_processor, qwen_model = load_qwen_processor_and_model(
+            args.qwen_checkpoint,
+            device=dist.device,
+            dtype=dtype,
+        )
+        for parameter in qwen_model.parameters():
+            parameter.requires_grad_(False)
+        first_hidden = extract_qwen_visual_tokens_online(
+            records[0],
+            processor=qwen_processor,
+            model=qwen_model,
+            device=dist.device,
+            dtype=dtype,
+        ).detach().cpu()
+    else:
+        first_hidden = load_semantic_tokens(args.cache_root / records[0].clip_id / "semantic_tokens.safetensors")
     model = GeoWireTransport(hidden_size=first_hidden.shape[-1], num_blocks=args.blocks)
     device = dist.device
     model.to(device)
@@ -54,13 +74,27 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
     for step in range(args.steps):
         record = records[(step * dist.world_size + dist.rank) % len(records)]
         clip_dir = args.cache_root / record.clip_id
-        clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(
-            device=device,
-            dtype=next(model.parameters()).dtype,
-        )
+        if args.tip_feature_mode == "online_qwen":
+            clean = extract_qwen_visual_tokens_online(
+                record,
+                processor=qwen_processor,
+                model=qwen_model,
+                device=device,
+                dtype=next(model.parameters()).dtype,
+            )
+        else:
+            clean = load_semantic_tokens(clip_dir / "semantic_tokens.safetensors").to(
+                device=device,
+                dtype=next(model.parameters()).dtype,
+            )
         layout = load_token_layout(clip_dir / "token_layout.safetensors")
         graph = graph_to_device(load_graph_npz(clip_dir / "graph_coo.npz"), device)
         frame_index = layout.frame_index.to(device)
+        if clean.shape[0] != graph.num_nodes or clean.shape[0] != layout.frame_index.numel():
+            raise RuntimeError(
+                f"TIP token count mismatch for {record.clip_id}: "
+                f"clean={clean.shape[0]}, graph={graph.num_nodes}, layout={layout.frame_index.numel()}"
+            )
 
         opt.zero_grad(set_to_none=True)
         loss, metrics = tip_loss_step(
@@ -115,6 +149,7 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
                 "lambda_keep": args.lambda_keep,
                 "manifest": str(args.manifest),
                 "cache_root": str(args.cache_root),
+                "tip_feature_mode": args.tip_feature_mode,
                 "world_size": dist.world_size,
             },
         )
@@ -165,6 +200,9 @@ def main() -> None:
     parser.add_argument("--lambda-sub", type=float, default=0.25)
     parser.add_argument("--lambda-keep", type=float, default=0.02)
     parser.add_argument("--device", default="cpu")
+    parser.add_argument("--tip-feature-mode", choices=["cached", "online_qwen"], default="cached")
+    parser.add_argument("--qwen-checkpoint", default="Qwen/Qwen3-VL-4B-Instruct")
+    parser.add_argument("--dtype", choices=["float16", "bfloat16", "float32"], default="bfloat16")
     parser.add_argument("--log-every", type=int, default=20)
     args = parser.parse_args()
     seed_everything(3407)

@@ -105,6 +105,44 @@ def extract_qwen_visual_cache(
     )
 
 
+@torch.inference_mode()
+def extract_qwen_visual_tokens_online(
+    record: ClipRecord,
+    *,
+    processor,
+    model,
+    device: torch.device,
+    dtype: torch.dtype | None = None,
+) -> torch.Tensor:
+    """Return frozen Qwen image features on the training device.
+
+    This is the training-time equivalent of `extract_qwen_visual_cache`, but it
+    avoids writing or reading large semantic token tensors from shared storage.
+    """
+
+    from qwen_vl_utils import process_vision_info
+
+    messages = ordered_image_messages(record)
+    text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    image_inputs, video_inputs = process_vision_info(messages)
+    if video_inputs:
+        raise ValueError("GeoWire online TIP uses ordered images, not Qwen video mode")
+    inputs = processor(text=[text], images=image_inputs, videos=None, padding=True, return_tensors="pt")
+    inputs = {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
+    if "pixel_values" not in inputs or "image_grid_thw" not in inputs:
+        raise RuntimeError("Qwen processor did not return pixel_values and image_grid_thw")
+    getter = getattr(model, "get_image_features", None)
+    if getter is None and hasattr(model, "model"):
+        getter = getattr(model.model, "get_image_features", None)
+    if getter is None:
+        raise TypeError("Qwen model does not expose get_image_features")
+    image_embeds, _deepstack = getter(inputs["pixel_values"], inputs["image_grid_thw"])
+    hidden = torch.cat([x.detach() for x in image_embeds], dim=0)
+    if dtype is not None:
+        hidden = hidden.to(dtype=dtype)
+    return hidden
+
+
 def _qwen_patch_and_merge(model, processor) -> tuple[int, int]:
     visual = getattr(model, "visual", None)
     config = getattr(model.config, "vision_config", None)

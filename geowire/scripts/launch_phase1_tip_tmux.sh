@@ -9,6 +9,9 @@ CACHE_ROOT="${CACHE_ROOT:?set CACHE_ROOT to a GeoWire cache root}"
 OUTPUT_DIR="${OUTPUT_DIR:-${PROJECT_ROOT}/runs/phase1_tip_$(date +%Y%m%d_%H%M%S)}"
 STEPS="${STEPS:-30000}"
 DEVICE="${DEVICE:-cuda}"
+TIP_FEATURE_MODE="${TIP_FEATURE_MODE:-online_qwen}"
+QWEN_CHECKPOINT="${QWEN_CHECKPOINT:-/mnt/guojh/lq/new/weights/base_models/Qwen3-VL-4B-Instruct}"
+DTYPE="${DTYPE:-bfloat16}"
 REQUIRE_REAL_CACHE="${REQUIRE_REAL_CACHE:-1}"
 MIN_CROSS_FRAME_COVERAGE="${MIN_CROSS_FRAME_COVERAGE:-0.01}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-1}"
@@ -26,6 +29,7 @@ fi
   --phase phase1 \
   --manifest "${MANIFEST}" \
   --cache-root "${CACHE_ROOT}" \
+  --tip-feature-mode "${TIP_FEATURE_MODE}" \
   "${READINESS_ARGS[@]}" \
   --write "${OUTPUT_DIR}/readiness.json"
 
@@ -34,9 +38,9 @@ if tmux has-session -t "${SESSION}" 2>/dev/null; then
   exit 1
 fi
 
-TRAIN_CMD="'${PYTHON_BIN}' scripts/train_tip.py --manifest '${MANIFEST}' --cache-root '${CACHE_ROOT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --device '${DEVICE}'"
+TRAIN_CMD="'${PYTHON_BIN}' scripts/train_tip.py --manifest '${MANIFEST}' --cache-root '${CACHE_ROOT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --device '${DEVICE}' --tip-feature-mode '${TIP_FEATURE_MODE}' --qwen-checkpoint '${QWEN_CHECKPOINT}' --dtype '${DTYPE}'"
 if [[ "${NPROC_PER_NODE}" != "1" ]]; then
-  TRAIN_CMD="'${PYTHON_BIN}' -m torch.distributed.run --standalone --nproc_per_node='${NPROC_PER_NODE}' scripts/train_tip.py --manifest '${MANIFEST}' --cache-root '${CACHE_ROOT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --device '${DEVICE}'"
+  TRAIN_CMD="'${PYTHON_BIN}' -m torch.distributed.run --standalone --nproc_per_node='${NPROC_PER_NODE}' scripts/train_tip.py --manifest '${MANIFEST}' --cache-root '${CACHE_ROOT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --device '${DEVICE}' --tip-feature-mode '${TIP_FEATURE_MODE}' --qwen-checkpoint '${QWEN_CHECKPOINT}' --dtype '${DTYPE}'"
 fi
 
 tmux new-session -d -s "${SESSION}" "cd '${PROJECT_ROOT}' && env PYTHONPATH='${PYTHONPATH_PREFIX}:${PYTHONPATH:-}' ${TRAIN_CMD} > 'logs/tmux/${SESSION}.log' 2>&1; echo EXIT_CODE=\$? >> 'logs/tmux/${SESSION}.log'"
