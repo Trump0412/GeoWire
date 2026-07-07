@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 from pathlib import Path
 
 import torch
@@ -113,7 +114,11 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
     metrics_rows: list[dict[str, float | int | str]] = []
+    started_at = time.monotonic()
     for step in range(args.steps):
+        step_started_at = time.monotonic()
+        if device.type == "cuda":
+            torch.cuda.reset_peak_memory_stats(device)
         batch_records = select_rank_batch(
             records,
             step=step,
@@ -176,6 +181,11 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
             "micro_batch_size": len(batch_records),
             **metrics,
         }
+        row["step_seconds"] = time.monotonic() - step_started_at
+        row["elapsed_seconds"] = time.monotonic() - started_at
+        if device.type == "cuda":
+            row["cuda_peak_allocated_gb"] = torch.cuda.max_memory_allocated(device) / (1024**3)
+            row["cuda_peak_reserved_gb"] = torch.cuda.max_memory_reserved(device) / (1024**3)
         if (step + 1) % args.eval_every == 0 or step == args.steps - 1:
             row.update(graph_control_metrics(model, clean, graph, frame_index, mask_ratio=args.mask_ratio))
         if dist.is_main:

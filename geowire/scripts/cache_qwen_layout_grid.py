@@ -14,12 +14,13 @@ from _bootstrap import bootstrap
 bootstrap()
 
 from geowire.constants import EDGE_PROJECTIVE
-from geowire.data.manifest import load_manifest
 from geowire.geometry.graph_builder import EdgeCandidates, build_graph
 from geowire.geometry.graph_io import save_graph_npz
 from geowire.geometry.qwen_layout import QwenTokenLayoutBuilder
 from geowire.geometry.vggt_cache import save_frame_transforms, save_token_layout, write_cache_metadata
 from geowire.models.qwen3vl_cache import _frame_transforms_from_grid, ordered_image_messages
+from geowire.types import ClipRecord
+from geowire.utils.io import iter_jsonl
 from geowire.utils.io import write_json
 
 
@@ -28,6 +29,24 @@ def clip_shard(clip_id: str, num_shards: int) -> int:
         return 0
     digest = hashlib.sha1(clip_id.encode("utf-8")).hexdigest()
     return int(digest[:12], 16) % num_shards
+
+
+def iter_manifest(path: Path):
+    for row in iter_jsonl(path):
+        yield ClipRecord(
+            clip_id=row["clip_id"],
+            scene_id=row["scene_id"],
+            source_dataset=row["source_dataset"],
+            frame_paths=tuple(row["frame_paths"]),
+            frame_indices=tuple(row["frame_indices"]),
+            timestamps_s=tuple(float(x) for x in row["timestamps_s"]),
+            split=row["split"],
+            question=row.get("question"),
+            answer=row.get("answer"),
+            task_type=row.get("task_type"),
+            static_view_permutation_allowed=bool(row.get("static_view_permutation_allowed", False)),
+            cache_dir=row.get("cache_dir"),
+        )
 
 
 def patch_and_merge(config, processor) -> tuple[int, int, int]:
@@ -179,12 +198,11 @@ def main() -> None:
 
     processor = AutoProcessor.from_pretrained(args.qwen_checkpoint, trust_remote_code=True)
     config = AutoConfig.from_pretrained(args.qwen_checkpoint, trust_remote_code=True)
-    records = load_manifest(args.manifest)
     seen: set[str] = set()
     processed = 0
     skipped_existing = 0
     skipped_shard = 0
-    for record in records:
+    for record in iter_manifest(args.manifest):
         if record.clip_id in seen:
             continue
         seen.add(record.clip_id)

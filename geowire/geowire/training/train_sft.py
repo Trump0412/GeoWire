@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import time
 from pathlib import Path
 
 import torch
@@ -245,7 +246,11 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
 
     rows: list[dict[str, object]] = []
     qa_to_tip = max(1, args.qa_to_tip)
+    started_at = time.monotonic()
     for step in range(args.steps):
+        step_started_at = time.monotonic()
+        if device.type == "cuda":
+            torch.cuda.reset_peak_memory_stats(device)
         use_tip = bool(tip_records) and ((step + 1) % (qa_to_tip + 1) == 0)
         if not use_deepspeed:
             opt.zero_grad(set_to_none=True)
@@ -344,6 +349,11 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
             loss.backward()
             average_gradients(bridge, dist)
             opt.step()
+        row["step_seconds"] = time.monotonic() - step_started_at
+        row["elapsed_seconds"] = time.monotonic() - started_at
+        if device.type == "cuda":
+            row["cuda_peak_allocated_gb"] = torch.cuda.max_memory_allocated(device) / (1024**3)
+            row["cuda_peak_reserved_gb"] = torch.cuda.max_memory_reserved(device) / (1024**3)
         if dist.is_main:
             rows.append(row)
         if dist.is_main and ((step + 1) % args.log_every == 0 or step == args.steps - 1):
