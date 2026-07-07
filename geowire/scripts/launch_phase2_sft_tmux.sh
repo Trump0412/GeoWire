@@ -21,6 +21,13 @@ TIP_FEATURE_MODE="${TIP_FEATURE_MODE:-online_qwen}"
 DEEPSPEED_CONFIG="${DEEPSPEED_CONFIG:-}"
 TRAIN_MICRO_BATCH_SIZE_PER_GPU="${TRAIN_MICRO_BATCH_SIZE_PER_GPU:-1}"
 GRADIENT_ACCUMULATION_STEPS="${GRADIENT_ACCUMULATION_STEPS:-1}"
+PIXEL_ENV=""
+if [[ -n "${GEOWIRE_IMAGE_MAX_PIXELS:-}" ]]; then
+  PIXEL_ENV="${PIXEL_ENV} GEOWIRE_IMAGE_MAX_PIXELS='${GEOWIRE_IMAGE_MAX_PIXELS}'"
+fi
+if [[ -n "${GEOWIRE_IMAGE_MIN_PIXELS:-}" ]]; then
+  PIXEL_ENV="${PIXEL_ENV} GEOWIRE_IMAGE_MIN_PIXELS='${GEOWIRE_IMAGE_MIN_PIXELS}'"
+fi
 
 cd "${PROJECT_ROOT}"
 mkdir -p "${OUTPUT_DIR}" logs/tmux
@@ -62,7 +69,7 @@ if [[ "${NPROC_PER_NODE}" != "1" ]]; then
   TRAIN_CMD="'${PYTHON_BIN}' -m torch.distributed.run --standalone --nproc_per_node='${NPROC_PER_NODE}' scripts/train_sft.py --qa-manifest '${QA_MANIFEST}' ${TIP_ARGS[*]} --cache-root '${CACHE_ROOT}' --qwen-checkpoint '${QWEN_CHECKPOINT}' --phase1-checkpoint '${PHASE1_CHECKPOINT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --save-every '${SAVE_EVERY}' --device '${DEVICE}' --qa-to-tip '${QA_TO_TIP}' --tip-feature-mode '${TIP_FEATURE_MODE}' ${DEEPSPEED_ARGS[*]}"
 fi
 
-tmux new-session -d -s "${SESSION}" "cd '${PROJECT_ROOT}' && env PYTHONPATH='${PYTHONPATH_PREFIX}:${PYTHONPATH:-}' ${CUDA_ENV} ${TRAIN_CMD} > 'logs/tmux/${SESSION}.log' 2>&1; echo EXIT_CODE=\$? >> 'logs/tmux/${SESSION}.log'"
+tmux new-session -d -s "${SESSION}" "cd '${PROJECT_ROOT}' && env PYTHONPATH='${PYTHONPATH_PREFIX}:${PYTHONPATH:-}' ${PIXEL_ENV} ${CUDA_ENV} ${TRAIN_CMD} > 'logs/tmux/${SESSION}.log' 2>&1; echo EXIT_CODE=\$? >> 'logs/tmux/${SESSION}.log'"
 
 echo "started ${SESSION}"
 echo "output: ${OUTPUT_DIR}"

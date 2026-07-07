@@ -448,3 +448,7 @@ def main() -> None:
     result = run_phase2(args)
     if int(os.environ.get("RANK", "0")) == 0:
         print(result)
+
+
+if __name__ == "__main__":
+    main()

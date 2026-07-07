@@ -320,7 +320,7 @@ Formal 2B cache queue:
 ```text
 date: 2026-07-07
 session: geowire_cache_qwen3vl2b_px376320_f8
-status: running
+status: paused after early cache; resume with --skip-existing after GPU ramps
 manifest: /mnt/guojh/lq/new/datasets/manifests/geowire_formal_f8/phase2_all.jsonl
 cache root: /mnt/guojh/lq/new/cache/geowire/formal_qwen3vl2b_f8_px376320_grid
 qwen checkpoint: /mnt/guojh/lq/new/models/Qwen/Qwen3-VL-2B-Instruct
@@ -331,6 +331,31 @@ early count: 1,268 cached clips at 2026-07-07 15:17:33 CST
 early throughput: about 5.5 clips/sec across 24 shards
 early ETA: about 18-22 hours for 370,380 unique clips; expected completion on
   2026-07-08 morning CST if the current rate holds
+```
+
+Ramps from the 2B path:
+
+```text
+phase1 session: geowire_p1_tip_qwen3vl2b_ramp512_b4_px376320_step50_8gpu
+phase1 status: passed, 50 steps, EXIT_CODE=0
+phase1 setting: 8 GPUs, microbatch 4/GPU, online_qwen, GEOWIRE_IMAGE_MAX_PIXELS=376320
+phase1 final loss: 0.28732481598854065
+phase1 final step_seconds: 10.828280536457896
+phase1 peak allocated/reserved: 7.92 GB / 14.29 GB on rank 0
+
+phase2 session b2: geowire_p2_sft_qwen3vl2b_ramp512_b2_px376320_step10_8gpu_v3
+phase2 b2 status: passed, 10 QA steps, EXIT_CODE=0
+phase2 b2 setting: 8 GPUs, ZeRO-2, microbatch 2/GPU
+phase2 b2 step_seconds: about 1.9-2.7 seconds
+phase2 b2 peak allocated/reserved: 41.27 GB / 65.95 GB on rank 0
+
+phase2 session b3: geowire_p2_sft_qwen3vl2b_ramp512_b3_px376320_step5_8gpu
+phase2 b3 status: passed, 5 QA steps, EXIT_CODE=0
+phase2 b3 setting: 8 GPUs, ZeRO-2, microbatch 3/GPU
+phase2 b3 step_seconds: about 3.0-3.8 seconds
+phase2 b3 peak allocated/reserved: 57.43 GB / 75.72 GB on rank 0
+current recommendation: use phase2 microbatch 3/GPU for the first formal run;
+  b4 is likely close to the OOM boundary without tighter length bucketing.
 ```
 
 Node218 8-GPU online-Qwen pilot:
