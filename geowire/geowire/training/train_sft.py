@@ -196,6 +196,19 @@ def load_phase1_adapter(geowire: GeoWireTransport, checkpoint: Path | None) -> N
     geowire.load_state_dict(model_state, strict=False)
 
 
+def save_phase2_adapters(path: Path, model) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    save_torch_state(
+        path,
+        {
+            "geowire": model.geowire.state_dict(),
+            "qwen_trainable": {
+                k: v.detach().cpu() for k, v in model.base_model.state_dict().items() if "lora_" in k
+            },
+        },
+    )
+
+
 def run_phase2(args: argparse.Namespace) -> dict[str, object]:
     seed_everything(args.seed)
     dist = init_distributed(args.device)
@@ -358,20 +371,26 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
             rows.append(row)
         if dist.is_main and ((step + 1) % args.log_every == 0 or step == args.steps - 1):
             print(row)
+        if dist.is_main and args.save_every > 0 and (step + 1) % args.save_every == 0:
+            save_model = train_model.module if use_deepspeed else bridge
+            ckpt_dir = args.output / f"checkpoint_step_{step + 1:06d}"
+            save_phase2_adapters(ckpt_dir / "phase2_adapters.pt", save_model)
+            write_jsonl(ckpt_dir / "metrics.jsonl", rows)
+            write_json(
+                ckpt_dir / "metrics.json",
+                {
+                    "steps": step + 1,
+                    "output": str(ckpt_dir),
+                    "world_size": dist.world_size,
+                    "final": rows[-1] if rows else {},
+                },
+            )
 
     barrier(dist)
     if dist.is_main:
         save_model = train_model.module if use_deepspeed else bridge
         args.output.mkdir(parents=True, exist_ok=True)
-        save_torch_state(
-            args.output / "phase2_adapters.pt",
-            {
-                "geowire": save_model.geowire.state_dict(),
-                "qwen_trainable": {
-                    k: v.detach().cpu() for k, v in save_model.base_model.state_dict().items() if "lora_" in k
-                },
-            },
-        )
+        save_phase2_adapters(args.output / "phase2_adapters.pt", save_model)
         write_jsonl(args.output / "metrics.jsonl", rows)
         final = {
             "steps": args.steps,
@@ -400,6 +419,7 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("runs/phase2_sft"))
     parser.add_argument("--steps", type=int, default=10)
     parser.add_argument("--log-every", type=int, default=1)
+    parser.add_argument("--save-every", type=int, default=0)
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--dtype", choices=["float16", "bfloat16", "float32"], default="bfloat16")
     parser.add_argument("--tip-feature-mode", choices=["online_qwen", "cached"], default="online_qwen")

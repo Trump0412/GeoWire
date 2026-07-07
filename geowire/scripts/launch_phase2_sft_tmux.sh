@@ -13,6 +13,7 @@ PHASE1_CHECKPOINT="${PHASE1_CHECKPOINT:?set PHASE1_CHECKPOINT to Phase1 geowire_
 PARITY_REPORT="${PARITY_REPORT:?set PARITY_REPORT to a passing qwen bridge parity report}"
 OUTPUT_DIR="${OUTPUT_DIR:-${PROJECT_ROOT}/runs/phase2_sft_$(date +%Y%m%d_%H%M%S)}"
 STEPS="${STEPS:-12000}"
+SAVE_EVERY="${SAVE_EVERY:-0}"
 DEVICE="${DEVICE:-cuda}"
 NPROC_PER_NODE="${NPROC_PER_NODE:-1}"
 QA_TO_TIP="${QA_TO_TIP:-15}"
@@ -56,9 +57,9 @@ if [[ -n "${CUDA_VISIBLE_DEVICES:-}" ]]; then
   CUDA_ENV="CUDA_VISIBLE_DEVICES='${CUDA_VISIBLE_DEVICES}'"
 fi
 
-TRAIN_CMD="'${PYTHON_BIN}' scripts/train_sft.py --qa-manifest '${QA_MANIFEST}' ${TIP_ARGS[*]} --cache-root '${CACHE_ROOT}' --qwen-checkpoint '${QWEN_CHECKPOINT}' --phase1-checkpoint '${PHASE1_CHECKPOINT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --device '${DEVICE}' --qa-to-tip '${QA_TO_TIP}' --tip-feature-mode '${TIP_FEATURE_MODE}' ${DEEPSPEED_ARGS[*]}"
+TRAIN_CMD="'${PYTHON_BIN}' scripts/train_sft.py --qa-manifest '${QA_MANIFEST}' ${TIP_ARGS[*]} --cache-root '${CACHE_ROOT}' --qwen-checkpoint '${QWEN_CHECKPOINT}' --phase1-checkpoint '${PHASE1_CHECKPOINT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --save-every '${SAVE_EVERY}' --device '${DEVICE}' --qa-to-tip '${QA_TO_TIP}' --tip-feature-mode '${TIP_FEATURE_MODE}' ${DEEPSPEED_ARGS[*]}"
 if [[ "${NPROC_PER_NODE}" != "1" ]]; then
-  TRAIN_CMD="'${PYTHON_BIN}' -m torch.distributed.run --standalone --nproc_per_node='${NPROC_PER_NODE}' scripts/train_sft.py --qa-manifest '${QA_MANIFEST}' ${TIP_ARGS[*]} --cache-root '${CACHE_ROOT}' --qwen-checkpoint '${QWEN_CHECKPOINT}' --phase1-checkpoint '${PHASE1_CHECKPOINT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --device '${DEVICE}' --qa-to-tip '${QA_TO_TIP}' --tip-feature-mode '${TIP_FEATURE_MODE}' ${DEEPSPEED_ARGS[*]}"
+  TRAIN_CMD="'${PYTHON_BIN}' -m torch.distributed.run --standalone --nproc_per_node='${NPROC_PER_NODE}' scripts/train_sft.py --qa-manifest '${QA_MANIFEST}' ${TIP_ARGS[*]} --cache-root '${CACHE_ROOT}' --qwen-checkpoint '${QWEN_CHECKPOINT}' --phase1-checkpoint '${PHASE1_CHECKPOINT}' --output '${OUTPUT_DIR}' --steps '${STEPS}' --save-every '${SAVE_EVERY}' --device '${DEVICE}' --qa-to-tip '${QA_TO_TIP}' --tip-feature-mode '${TIP_FEATURE_MODE}' ${DEEPSPEED_ARGS[*]}"
 fi
 
 tmux new-session -d -s "${SESSION}" "cd '${PROJECT_ROOT}' && env PYTHONPATH='${PYTHONPATH_PREFIX}:${PYTHONPATH:-}' ${CUDA_ENV} ${TRAIN_CMD} > 'logs/tmux/${SESSION}.log' 2>&1; echo EXIT_CODE=\$? >> 'logs/tmux/${SESSION}.log'"
