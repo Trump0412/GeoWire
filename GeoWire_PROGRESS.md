@@ -315,6 +315,24 @@ Use the verified `/mnt/guojh/lq/new/models/Qwen/Qwen3-VL-2B-Instruct` path,
 then rerun the memory ramp and launch the formal 8-card run from the 2B path.
 ```
 
+Formal 2B cache queue:
+
+```text
+date: 2026-07-07
+session: geowire_cache_qwen3vl2b_px376320_f8
+status: running
+manifest: /mnt/guojh/lq/new/datasets/manifests/geowire_formal_f8/phase2_all.jsonl
+cache root: /mnt/guojh/lq/new/cache/geowire/formal_qwen3vl2b_f8_px376320_grid
+qwen checkpoint: /mnt/guojh/lq/new/models/Qwen/Qwen3-VL-2B-Instruct
+image max pixels: 376320
+shards: 24
+gpu use: none
+early count: 1,268 cached clips at 2026-07-07 15:17:33 CST
+early throughput: about 5.5 clips/sec across 24 shards
+early ETA: about 18-22 hours for 370,380 unique clips; expected completion on
+  2026-07-08 morning CST if the current rate holds
+```
+
 Node218 8-GPU online-Qwen pilot:
 
 ```text
