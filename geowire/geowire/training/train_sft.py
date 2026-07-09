@@ -209,6 +209,18 @@ def save_phase2_adapters(path: Path, model) -> None:
     )
 
 
+def load_phase2_adapters(model, checkpoint: Path | None) -> None:
+    if checkpoint is None:
+        return
+    state = load_torch_state(checkpoint)
+    geowire_state = state.get("geowire")
+    if geowire_state:
+        model.geowire.load_state_dict(geowire_state, strict=False)
+    qwen_state = state.get("qwen_trainable")
+    if qwen_state:
+        model.base_model.load_state_dict(qwen_state, strict=False)
+
+
 def run_phase2(args: argparse.Namespace) -> dict[str, object]:
     seed_everything(args.seed)
     dist = init_distributed(args.device)
@@ -230,6 +242,7 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
     geowire = GeoWireTransport(hidden_size=hidden_size, num_blocks=args.blocks).to(device)
     load_phase1_adapter(geowire, args.phase1_checkpoint)
     bridge = Qwen3VLGeoWireForConditionalGeneration(base_model, geowire, token_layout_builder=None).to(device)
+    load_phase2_adapters(bridge, args.phase2_checkpoint)
     bridge.train()
     trainable_parameters = [p for p in bridge.parameters() if p.requires_grad]
     use_deepspeed = args.deepspeed_config is not None
@@ -260,15 +273,17 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
     rows: list[dict[str, object]] = []
     qa_to_tip = max(1, args.qa_to_tip)
     started_at = time.monotonic()
-    for step in range(args.steps):
+    for local_step in range(args.steps):
+        step = args.start_step + local_step
+        data_step = args.data_step_offset + local_step
         step_started_at = time.monotonic()
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats(device)
-        use_tip = bool(tip_records) and ((step + 1) % (qa_to_tip + 1) == 0)
+        use_tip = bool(tip_records) and ((data_step + 1) % (qa_to_tip + 1) == 0)
         if not use_deepspeed:
             opt.zero_grad(set_to_none=True)
         if use_tip:
-            tip_step = step // (qa_to_tip + 1)
+            tip_step = data_step // (qa_to_tip + 1)
             records = select_rank_batch(
                 tip_records,
                 step_index=tip_step,
@@ -334,7 +349,7 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
         else:
             records = select_rank_batch(
                 qa_dataset,
-                step_index=step,
+                step_index=data_step,
                 rank=dist.rank,
                 world_size=dist.world_size,
                 batch_size=args.train_micro_batch_size_per_gpu,
@@ -364,6 +379,8 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
             opt.step()
         row["step_seconds"] = time.monotonic() - step_started_at
         row["elapsed_seconds"] = time.monotonic() - started_at
+        row["local_step"] = local_step + 1
+        row["data_step"] = data_step + 1
         if device.type == "cuda":
             row["cuda_peak_allocated_gb"] = torch.cuda.max_memory_allocated(device) / (1024**3)
             row["cuda_peak_reserved_gb"] = torch.cuda.max_memory_reserved(device) / (1024**3)
@@ -393,7 +410,8 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
         save_phase2_adapters(args.output / "phase2_adapters.pt", save_model)
         write_jsonl(args.output / "metrics.jsonl", rows)
         final = {
-            "steps": args.steps,
+            "steps": args.start_step + args.steps,
+            "local_steps": args.steps,
             "output": str(args.output),
             "world_size": dist.world_size,
             "final": rows[-1] if rows else {},
@@ -404,7 +422,12 @@ def run_phase2(args: argparse.Namespace) -> dict[str, object]:
         trainer_state["deepspeed_enabled"] = use_deepspeed
         write_json(args.output / "trainer_state.json", trainer_state)
     else:
-        final = {"steps": args.steps, "rank": dist.rank, "world_size": dist.world_size}
+        final = {
+            "steps": args.start_step + args.steps,
+            "local_steps": args.steps,
+            "rank": dist.rank,
+            "world_size": dist.world_size,
+        }
     cleanup(dist)
     return final
 
@@ -416,8 +439,11 @@ def main() -> None:
     parser.add_argument("--cache-root", type=Path, required=True)
     parser.add_argument("--qwen-checkpoint", default="Qwen/Qwen3-VL-2B-Instruct")
     parser.add_argument("--phase1-checkpoint", type=Path)
+    parser.add_argument("--phase2-checkpoint", type=Path)
     parser.add_argument("--output", type=Path, default=Path("runs/phase2_sft"))
     parser.add_argument("--steps", type=int, default=10)
+    parser.add_argument("--start-step", type=int, default=0)
+    parser.add_argument("--data-step-offset", type=int, default=0)
     parser.add_argument("--log-every", type=int, default=1)
     parser.add_argument("--save-every", type=int, default=0)
     parser.add_argument("--device", default="cuda")

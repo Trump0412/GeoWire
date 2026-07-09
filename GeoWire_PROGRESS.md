@@ -443,3 +443,52 @@ python scripts/evaluate.py \
 - Graph thresholds must be calibrated on real clips with visual overlay audit; the smoke used loose thresholds only to verify the engineering path.
 - Phase 1 should not advance to paper Phase 2 claims until full graph beats self/random/shuffled controls on a real validation subset.
 - Benchmark generation wrappers still need real prediction runs for VSI/MMSI/ViewSpatial; the scorer already exists.
+
+## 2026-07-09 Node214 Resume
+
+Node218 8-card formal Phase 2 run stopped before completion after node218 became
+unavailable for continued use. The shared run artifacts were inspected from
+node214.
+
+Previous 8-card run:
+
+```text
+session: geowire_p2_sft_qwen3vl2b_formal_b3_ga3_px376320_8gpu
+last logged step: 36300 / 60000
+last logged progress: 60.5%
+latest durable checkpoint: checkpoint_step_035000
+latest checkpoint path:
+  /mnt/guojh/lq/new/GeoWire/geowire/runs/geowire_p2_sft_qwen3vl2b_formal_b3_ga3_px376320_8gpu/checkpoint_step_035000/phase2_adapters.pt
+note: steps 35001-36300 were not checkpointed and are intentionally replayed/lost.
+```
+
+Resume code update:
+
+```text
+file: geowire/geowire/training/train_sft.py
+added: --phase2-checkpoint for loading Phase 2 adapters
+added: --start-step for checkpoint/log numbering
+added: --data-step-offset for continuing data sampling after changing world size
+```
+
+Node214 resume:
+
+```text
+session: geowire_p2_sft_qwen3vl2b_resume214_4gpu_b3_ga6_from35000_px376320
+node: node214
+gpus: 0,1,2,4
+world size: 4
+microbatch per gpu: 3
+gradient accumulation: 6
+effective batch: 72, matching the previous 8-card run
+phase2 checkpoint: checkpoint_step_035000 from the 8-card run
+start step: 35000
+data step offset: 70000
+local steps to run: 50000
+qa_to_tip: 15
+image max pixels: 376320
+initial health: step 35140 reached with no OOM/Traceback/FAILED
+initial speed: about 3.59 seconds per local micro-step
+initial ETA: about 49.8 hours from 2026-07-09 14:50 CST
+initial expected finish: about 2026-07-11 16:36 CST
+```
