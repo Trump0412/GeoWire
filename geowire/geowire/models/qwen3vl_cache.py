@@ -81,7 +81,7 @@ def extract_qwen_visual_cache(
     text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     image_inputs, video_inputs = process_vision_info(messages)
     if video_inputs:
-        raise ValueError("GeoWire Phase 0/1 cache uses ordered images, not Qwen video mode")
+        raise ValueError("Georoute Phase 0/1 cache uses ordered images, not Qwen video mode")
     inputs = processor(text=[text], images=image_inputs, videos=None, padding=True, return_tensors="pt")
     device = next(model.parameters()).device
     inputs = {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
@@ -134,7 +134,7 @@ def extract_qwen_visual_tokens_online(
     text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     image_inputs, video_inputs = process_vision_info(messages)
     if video_inputs:
-        raise ValueError("GeoWire online TIP uses ordered images, not Qwen video mode")
+        raise ValueError("Georoute online TIP uses ordered images, not Qwen video mode")
     inputs = processor(text=[text], images=image_inputs, videos=None, padding=True, return_tensors="pt")
     inputs = {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
     if "pixel_values" not in inputs or "image_grid_thw" not in inputs:

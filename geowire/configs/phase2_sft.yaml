@@ -6,12 +6,12 @@ model:
   freeze_vision: true
   train_visual_merger_lora: true
   train_language_lora: true
-  phase1_checkpoint: /mnt/guojh/lq/new/GeoWire/geowire/runs/phase1_tip/geowire_adapter.pt
+  phase1_checkpoint: runs/phase1_tip/geowire_adapter.pt
 
 data:
-  qa_manifest: /mnt/guojh/lq/new/datasets/geowire/phase2_core_clean.jsonl
-  tip_manifest: /mnt/guojh/lq/new/datasets/geowire/phase1_train.jsonl
-  cache_root: /mnt/guojh/lq/new/cache/geowire/phase1
+  qa_manifest: data/manifests/georoute_formal_f8/phase2_all.jsonl
+  tip_manifest: data/manifests/georoute_formal_f8/phase2_tip_multiframe.jsonl
+  cache_root: cache/georoute/phase1
 
 lora:
   r: 32
@@ -27,7 +27,7 @@ lora:
     - down_proj
 
 tip:
-  qa_to_tip_batch_ratio: 3:1
+  qa_to_tip_batch_ratio: 15:1
   lambda_tip_effective: 0.20
   lambda_sub: 0.25
   lambda_keep: 0.02

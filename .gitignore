@@ -37,3 +37,12 @@ geowire/third_party/vggt/
 .DS_Store
 .idea/
 .vscode/
+
+# Internal planning notes are kept locally but omitted from review releases.
+*_Codex_*.md
+*_Master_Design*.md
+*_Method_Training_Details.md
+*_PROGRESS.md
+*_Training_Protocol.md
+geowire/docs/*.md
+geowire/scripts/*.bak_*

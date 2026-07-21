@@ -145,7 +145,7 @@ def collect_image_inputs(messages_list):
     for messages in messages_list:
         image_inputs, video_inputs = process_vision_info(messages)
         if video_inputs:
-            raise ValueError("GeoWire Phase 2 uses ordered images, not Qwen video mode")
+            raise ValueError("Georoute Phase 2 uses ordered images, not Qwen video mode")
         images.extend(image_inputs or [])
     return images
 

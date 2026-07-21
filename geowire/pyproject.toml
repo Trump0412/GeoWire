@@ -3,9 +3,9 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "geowire"
+name = "georoute"
 version = "0.1.0"
-description = "Geometry-wired cross-frame semantic transport for video spatial reasoning."
+description = "Georoute: geometry-controlled cross-frame semantic transport for spatial reasoning."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

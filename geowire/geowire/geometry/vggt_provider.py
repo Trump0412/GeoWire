@@ -13,7 +13,7 @@ from geowire.types import FrameTransform, VGGTGeometry
 class VGGTProvider:
     """Thin wrapper around pinned VGGT source.
 
-    VGGT execution is isolated here so the main GeoWire code does not edit upstream
+    VGGT execution is isolated here so the main Georoute code does not edit upstream
     files or use VGGT hidden states as semantic values.
     """
 

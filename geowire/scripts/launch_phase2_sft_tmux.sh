@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/guojh/lq/new/GeoWire/geowire}"
-PYTHON_BIN="${PYTHON_BIN:-/mnt/guojh/lq/new/conda/envs/geothinker/bin/python}"
-PYTHONPATH_PREFIX="${PYTHONPATH_PREFIX:-/mnt/guojh/lq/new/GeoWire/.deps/transformers_4_57_6:${PROJECT_ROOT}}"
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+PYTHON_BIN="${PYTHON_BIN:-python}"
+PYTHONPATH_PREFIX="${PYTHONPATH_PREFIX:-${PROJECT_ROOT}}"
 SESSION="${SESSION:-geowire_phase2_sft}"
-QA_MANIFEST="${QA_MANIFEST:?set QA_MANIFEST to a GeoWire Phase2 QA manifest}"
+QA_MANIFEST="${QA_MANIFEST:?set QA_MANIFEST to a Georoute Phase 2 QA manifest}"
 TIP_MANIFEST="${TIP_MANIFEST:-}"
-CACHE_ROOT="${CACHE_ROOT:?set CACHE_ROOT to a real GeoWire cache root}"
-QWEN_CHECKPOINT="${QWEN_CHECKPOINT:-/mnt/guojh/lq/new/models/Qwen/Qwen3-VL-2B-Instruct}"
+CACHE_ROOT="${CACHE_ROOT:?set CACHE_ROOT to a real Georoute cache root}"
+QWEN_CHECKPOINT="${QWEN_CHECKPOINT:-Qwen/Qwen3-VL-2B-Instruct}"
 PHASE1_CHECKPOINT="${PHASE1_CHECKPOINT:?set PHASE1_CHECKPOINT to Phase1 geowire_adapter.pt}"
 PARITY_REPORT="${PARITY_REPORT:?set PARITY_REPORT to a passing qwen bridge parity report}"
 OUTPUT_DIR="${OUTPUT_DIR:-${PROJECT_ROOT}/runs/phase2_sft_$(date +%Y%m%d_%H%M%S)}"

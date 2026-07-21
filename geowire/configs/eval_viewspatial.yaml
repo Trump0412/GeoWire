@@ -1,5 +1,5 @@
 benchmark_name: viewspatial_bench
-data_root: /mnt/guojh/lq/new/datasets/benchmarks/ViewSpatial
+data_root: data/benchmarks/ViewSpatial
 sampling:
   num_frames: 4
   strategy: benchmark_official

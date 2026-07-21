@@ -1,10 +1,10 @@
 seed: 3407
 
 paths:
-  project_root: /mnt/guojh/lq/new/GeoWire/geowire
-  data_root: /mnt/guojh/lq/new/datasets
-  weight_root: /mnt/guojh/lq/new/weights/base_models
-  cache_root: /mnt/guojh/lq/new/cache/geowire
+  project_root: .
+  data_root: data
+  weight_root: models
+  cache_root: cache/georoute
 
 runtime:
   output_dir: runs/debug
@@ -13,14 +13,14 @@ runtime:
 
 qwen:
   checkpoint: Qwen/Qwen3-VL-2B-Instruct
-  local_path: /mnt/guojh/lq/new/models/Qwen/Qwen3-VL-2B-Instruct
+  local_path: models/Qwen3-VL-2B-Instruct
   input_mode: ordered_images
   min_pixels: 262144
   max_pixels: 1048576
 
 geometry:
   vggt_checkpoint: facebook/VGGT-1B
-  vggt_local_path: /mnt/guojh/lq/new/weights/base_models/VGGT-1B
+  vggt_local_path: models/VGGT-1B
   vggt_preprocess_mode: pad
   dtype: bfloat16
 

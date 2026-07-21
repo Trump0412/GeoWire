@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_ROOT="${PROJECT_ROOT:-/mnt/guojh/lq/new/GeoWire/geowire}"
-PYTHON_BIN="${PYTHON_BIN:-/mnt/guojh/lq/new/conda/envs/geothinker/bin/python}"
-DATA_ROOT="${DATA_ROOT:-/mnt/guojh/lq/new/local_mirror/myproject/spatial4nips/data/train}"
-MANIFEST_ROOT="${MANIFEST_ROOT:-/mnt/guojh/lq/new/datasets/manifests/geowire_formal_f8}"
-MEDIA_ROOT="${MEDIA_ROOT:-/mnt/guojh/lq/new/local_mirror/myproject/spatial4nips/data/media}"
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
+PYTHON_BIN="${PYTHON_BIN:-python}"
+DATA_ROOT="${DATA_ROOT:-data/train}"
+MANIFEST_ROOT="${MANIFEST_ROOT:-data/manifests/georoute_formal_f8}"
+MEDIA_ROOT="${MEDIA_ROOT:-data/media}"
 MAX_FRAMES="${MAX_FRAMES:-8}"
 
 cd "${PROJECT_ROOT}"

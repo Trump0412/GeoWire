@@ -26,7 +26,7 @@ def build_inputs(processor, record, *, device: torch.device):
     text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
     image_inputs, video_inputs = process_vision_info(messages)
     if video_inputs:
-        raise ValueError("GeoWire parity uses ordered images, not video mode")
+        raise ValueError("Georoute parity uses ordered images, not video mode")
     inputs = processor(text=[text], images=image_inputs, videos=None, padding=True, return_tensors="pt")
     return {k: v.to(device) if hasattr(v, "to") else v for k, v in inputs.items()}
 

@@ -1,4 +1,4 @@
-"""GeoWire core package."""
+"""Georoute core package."""
 
 from geowire.types import (
     Affine2D,

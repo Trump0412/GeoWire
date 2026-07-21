@@ -45,13 +45,13 @@ def graph_to_device(graph: SparseGraph, device: torch.device) -> SparseGraph:
 
 
 class Qwen3VLGeoWireForConditionalGeneration(nn.Module):
-    """Qwen3-VL bridge that inserts GeoWire into the image feature path.
+    """Qwen3-VL bridge that inserts Georoute into the image feature path.
 
     The installed Transformers implementation owns token replacement, RoPE,
     deepstack features, language layers and generation. This bridge wraps only
     `base_model.model.get_image_features`: split image features are concatenated,
-    passed through GeoWire once, and split back before the original forward
-    continues. With all GeoWire alphas at zero, the wrapped model should match
+    passed through Georoute once, and split back before the original forward
+    continues. With all Georoute alphas at zero, the wrapped model should match
     the base model exactly.
     """
 
@@ -92,7 +92,7 @@ class Qwen3VLGeoWireForConditionalGeneration(nn.Module):
             split_sizes = [int(x.shape[0]) for x in image_embeds]
             concat = torch.cat(image_embeds, dim=0)
             if graph.num_nodes != concat.shape[0]:
-                raise ValueError(f"GeoWire graph has {graph.num_nodes} nodes but Qwen produced {concat.shape[0]} image tokens")
+                raise ValueError(f"Georoute graph has {graph.num_nodes} nodes but Qwen produced {concat.shape[0]} image tokens")
             geowire_dtype = next(self.geowire.parameters()).dtype
             transported = self.geowire(concat.to(dtype=geowire_dtype), graph_to_device(graph, concat.device))
             transported = transported.to(dtype=concat.dtype)

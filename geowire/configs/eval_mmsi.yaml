@@ -1,5 +1,5 @@
 benchmark_name: mmsi_bench
-data_root: /mnt/guojh/lq/new/datasets/benchmarks/MMSI_Bench
+data_root: data/benchmarks/MMSI_Bench
 sampling:
   num_frames: 8
   strategy: benchmark_official

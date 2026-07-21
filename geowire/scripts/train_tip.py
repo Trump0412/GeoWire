@@ -17,7 +17,7 @@ from geowire.geometry.graph_io import load_graph_npz
 from geowire.geometry.vggt_cache import load_semantic_tokens, load_token_layout
 from geowire.models.geowire import GeoWireTransport
 from geowire.models.qwen3vl_cache import extract_qwen_visual_tokens_online, load_qwen_processor_and_model
-from geowire.training.checkpoints import save_torch_state
+from geowire.training.checkpoints import load_torch_state, save_torch_state
 from geowire.training.distributed import average_gradients, barrier, broadcast_parameters, cleanup, init_distributed
 from geowire.training.pretrain_tip import graph_control_metrics, run_tip_debug_step, tip_loss_step
 from geowire.types import SparseGraph
@@ -81,6 +81,67 @@ def select_rank_batch(records, *, step: int, rank: int, world_size: int, batch_s
     return [records[(start + local) % len(records)] for local in range(batch_size)]
 
 
+def optimizer_state_to_device(opt: torch.optim.Optimizer, device: torch.device) -> None:
+    for state in opt.state.values():
+        for key, value in list(state.items()):
+            if torch.is_tensor(value):
+                state[key] = value.to(device)
+
+
+def checkpoint_file(path: Path) -> Path:
+    if path.is_dir():
+        training_state = path / "training_state.pt"
+        if training_state.exists():
+            return training_state
+        adapter = path / "geowire_adapter.pt"
+        if adapter.exists():
+            return adapter
+    return path
+
+
+def save_phase1_checkpoint(
+    output: Path,
+    *,
+    model: GeoWireTransport,
+    opt: torch.optim.Optimizer,
+    step: int,
+    hidden_size: int,
+    blocks: int,
+    args: argparse.Namespace,
+    metrics_rows: list[dict[str, float | int | str]],
+    num_records: int,
+) -> Path:
+    ckpt_dir = output / f"checkpoint_step_{step:06d}"
+    adapter_state = {
+        "model": model.state_dict(),
+        "hidden_size": hidden_size,
+        "blocks": blocks,
+        "step": step,
+    }
+    save_torch_state(ckpt_dir / "geowire_adapter.pt", adapter_state)
+    save_torch_state(
+        ckpt_dir / "training_state.pt",
+        {
+            **adapter_state,
+            "optimizer": opt.state_dict(),
+            "args": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
+            "num_records": num_records,
+        },
+    )
+    write_jsonl(ckpt_dir / "metrics.jsonl", metrics_rows)
+    write_json(
+        ckpt_dir / "metrics.json",
+        {
+            "steps": step,
+            "checkpoint": str(ckpt_dir / "geowire_adapter.pt"),
+            "training_state": str(ckpt_dir / "training_state.pt"),
+            "final": metrics_rows[-1] if metrics_rows else {},
+            "num_records": num_records,
+        },
+    )
+    return ckpt_dir
+
+
 def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str]:
     dist = init_distributed(args.device)
     records = load_manifest(args.manifest)
@@ -110,12 +171,23 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
     model = GeoWireTransport(hidden_size=first_hidden.shape[-1], num_blocks=args.blocks)
     device = dist.device
     model.to(device)
+    resume_state = None
+    start_step = int(args.start_step)
+    if args.resume_from_checkpoint:
+        ckpt_path = checkpoint_file(args.resume_from_checkpoint)
+        resume_state = load_torch_state(ckpt_path, map_location="cpu")
+        model.load_state_dict(resume_state["model"], strict=True)
+        start_step = int(resume_state.get("step", start_step))
     broadcast_parameters(model, dist)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    if resume_state is not None and "optimizer" in resume_state:
+        opt.load_state_dict(resume_state["optimizer"])
+        optimizer_state_to_device(opt, device)
 
     metrics_rows: list[dict[str, float | int | str]] = []
     started_at = time.monotonic()
-    for step in range(args.steps):
+    for local_step in range(args.steps):
+        step = start_step + local_step
         step_started_at = time.monotonic()
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats(device)
@@ -173,8 +245,11 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
         loss.backward()
         average_gradients(model, dist)
         opt.step()
+        global_step = step + 1
         row: dict[str, float | int | str] = {
-            "step": step + 1,
+            "step": global_step,
+            "local_step": local_step + 1,
+            "start_step": start_step,
             "rank": dist.rank,
             "world_size": dist.world_size,
             "clip_id": ",".join(record.clip_id for record in batch_records),
@@ -186,32 +261,68 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
         if device.type == "cuda":
             row["cuda_peak_allocated_gb"] = torch.cuda.max_memory_allocated(device) / (1024**3)
             row["cuda_peak_reserved_gb"] = torch.cuda.max_memory_reserved(device) / (1024**3)
-        if (step + 1) % args.eval_every == 0 or step == args.steps - 1:
+        if global_step % args.eval_every == 0 or local_step == args.steps - 1:
             row.update(graph_control_metrics(model, clean, graph, frame_index, mask_ratio=args.mask_ratio))
         if dist.is_main:
             metrics_rows.append(row)
-            if (step + 1) % args.log_every == 0 or step == args.steps - 1:
+            if global_step % args.log_every == 0 or local_step == args.steps - 1:
                 print(row, flush=True)
+            if args.save_every > 0 and global_step % args.save_every == 0:
+                ckpt_dir = save_phase1_checkpoint(
+                    args.output,
+                    model=model,
+                    opt=opt,
+                    step=global_step,
+                    hidden_size=first_hidden.shape[-1],
+                    blocks=args.blocks,
+                    args=args,
+                    metrics_rows=metrics_rows,
+                    num_records=len(records),
+                )
+                print({"checkpoint_saved": str(ckpt_dir), "step": global_step}, flush=True)
 
     barrier(dist)
     if dist.is_main:
         args.output.mkdir(parents=True, exist_ok=True)
+        final_step = start_step + args.steps
         save_torch_state(
             args.output / "geowire_adapter.pt",
             {
                 "model": model.state_dict(),
                 "hidden_size": first_hidden.shape[-1],
                 "blocks": args.blocks,
+                "step": final_step,
+            },
+        )
+        save_torch_state(
+            args.output / "training_state.pt",
+            {
+                "model": model.state_dict(),
+                "optimizer": opt.state_dict(),
+                "hidden_size": first_hidden.shape[-1],
+                "blocks": args.blocks,
+                "step": final_step,
+                "args": {k: str(v) if isinstance(v, Path) else v for k, v in vars(args).items()},
+                "num_records": len(records),
             },
         )
         write_jsonl(args.output / "metrics.jsonl", metrics_rows)
         final = dict(metrics_rows[-1])
-        final.update({"num_records": len(records), "checkpoint": str(args.output / "geowire_adapter.pt")})
+        final.update({
+            "num_records": len(records),
+            "checkpoint": str(args.output / "geowire_adapter.pt"),
+            "training_state": str(args.output / "training_state.pt"),
+            "steps": final_step,
+            "local_steps": args.steps,
+            "start_step": start_step,
+        })
         write_json(args.output / "metrics.json", final)
         write_json(
             args.output / "trainer_state.json",
             {
-                "steps": args.steps,
+                "steps": final_step,
+                "local_steps": args.steps,
+                "start_step": start_step,
                 "lr": args.lr,
                 "weight_decay": args.weight_decay,
                 "mask_ratio": args.mask_ratio,
@@ -224,7 +335,7 @@ def run_cached_training(args: argparse.Namespace) -> dict[str, float | int | str
             },
         )
     else:
-        final = {"steps": args.steps, "rank": dist.rank, "world_size": dist.world_size}
+        final = {"steps": start_step + args.steps, "local_steps": args.steps, "rank": dist.rank, "world_size": dist.world_size}
     cleanup(dist)
     return final
 
@@ -262,6 +373,9 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--cache-root", type=Path)
     parser.add_argument("--steps", type=int, default=4)
+    parser.add_argument("--start-step", type=int, default=0)
+    parser.add_argument("--resume-from-checkpoint", type=Path)
+    parser.add_argument("--save-every", type=int, default=0)
     parser.add_argument("--eval-every", type=int, default=2)
     parser.add_argument("--blocks", type=int, default=2)
     parser.add_argument("--lr", type=float, default=2.0e-4)

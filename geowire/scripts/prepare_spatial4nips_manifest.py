@@ -199,7 +199,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path, nargs="+", required=True)
     parser.add_argument("--source-dataset", required=True)
-    parser.add_argument("--media-root", type=Path, default=Path("/mnt/guojh/lq/new/local_mirror/myproject/spatial4nips/data/media"))
+    parser.add_argument("--media-root", type=Path, default=Path("data/media"))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-frames", type=int, default=8)
     parser.add_argument("--min-frames", type=int, default=1)
